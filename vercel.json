@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/setup-prayer-times",
+      "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/materialize-recurring",
+      "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/weather-check",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/setup-spiritual-calendar",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/send-reminders",
+      "schedule": "* * * * *"
+    }
+  ]
+}

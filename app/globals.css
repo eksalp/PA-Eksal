@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  @apply bg-neutral-50 text-neutral-900 dark:bg-[#0b0b0f] dark:text-neutral-100;
+}
+
+/* Kartu gaya glassmorphism dipakai di dashboard — sesuai UI style di brief */
+.glass-card {
+  @apply rounded-2xl border border-white/20 bg-white/60 shadow-sm backdrop-blur-md
+    dark:border-white/10 dark:bg-white/5;
+}
