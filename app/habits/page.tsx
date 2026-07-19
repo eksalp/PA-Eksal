@@ -1,24 +1,34 @@
 import { createClient } from "@/lib/supabase/server";
-import { format } from "date-fns";
 import { HabitCheckIn } from "./habit-check-in";
+import { HabitForm } from "./habit-form";
+
+const jakartaDate = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
+  );
 
 export default async function HabitsPage() {
-  const supabase = createClient();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const supabase = createClient() as any;
+  const today = jakartaDate();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return <div className="glass-card p-6 text-sm text-neutral-500">Silakan login dulu.</div>;
+    return (
+      <div className="glass-card p-6 text-sm text-neutral-500">
+        Silakan login dulu.
+      </div>
+    );
   }
 
   const { data: habits } = await supabase
     .from("habits")
     .select("*")
     .eq("user_id", user.id)
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .order("created_at");
 
   const { data: logs } = await supabase
     .from("habit_logs")
@@ -29,9 +39,12 @@ export default async function HabitsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Habit Tracker</h1>
+
+      <HabitForm userId={user.id} />
+
       <div className="grid gap-3 sm:grid-cols-2">
-        {habits?.map((h) => {
-          const log = logs?.find((l) => l.habit_id === h.id);
+        {(habits ?? []).map((h: any) => {
+          const log = (logs ?? []).find((l: any) => l.habit_id === h.id);
           return (
             <HabitCheckIn
               key={h.id}
@@ -45,8 +58,7 @@ export default async function HabitsPage() {
       </div>
       {(!habits || habits.length === 0) && (
         <p className="text-sm text-neutral-400">
-          Belum ada habit. Tambahkan lewat Supabase Studio untuk sekarang — form tambah habit
-          bisa dibuat di iterasi berikutnya.
+          Belum ada habit. Tambahkan di atas.
         </p>
       )}
     </div>

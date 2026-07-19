@@ -1,17 +1,35 @@
 import { createClient } from "@/lib/supabase/server";
-import { format } from "date-fns";
 import { NewActivityForm } from "./new-activity-form";
+import { ActivityItem } from "./activity-item";
+
+// Waktu WIB — server Vercel jalan di UTC.
+const jakartaDate = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
+  );
+const jakartaLabel = () =>
+  new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
 
 export default async function ActivitiesPage() {
-  const supabase = createClient();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const supabase = createClient() as any;
+  const today = jakartaDate();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return <div className="glass-card p-6 text-sm text-neutral-500">Silakan login dulu.</div>;
+    return (
+      <div className="glass-card p-6 text-sm text-neutral-500">
+        Silakan login dulu.
+      </div>
+    );
   }
 
   const { data: activities } = await supabase
@@ -21,31 +39,28 @@ export default async function ActivitiesPage() {
     .eq("scheduled_date", today)
     .order("scheduled_time", { ascending: true, nullsFirst: false });
 
+  const acts = activities ?? [];
+  const doneCount = acts.filter((a: any) => a.status === "completed").length;
+
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Timeline Hari Ini</h1>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-xl font-semibold">Timeline</h1>
+        <span className="text-sm text-neutral-400">
+          {doneCount}/{acts.length} selesai · {jakartaLabel()}
+        </span>
+      </div>
 
       <NewActivityForm userId={user.id} scheduledDate={today} />
 
       <ul className="space-y-2">
-        {activities?.map((a) => (
-          <li key={a.id} className="glass-card flex items-center justify-between p-4 text-sm">
-            <div>
-              <span className="font-medium">{a.title}</span>
-              {a.scheduled_time && (
-                <span className="ml-2 text-neutral-400">{a.scheduled_time.slice(0, 5)}</span>
-              )}
-              {a.category && (
-                <span className="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs dark:bg-white/10">
-                  {a.category}
-                </span>
-              )}
-            </div>
-            <span className="text-xs uppercase text-neutral-400">{a.status}</span>
-          </li>
+        {acts.map((a: any) => (
+          <ActivityItem key={a.id} activity={a} />
         ))}
-        {(!activities || activities.length === 0) && (
-          <p className="text-sm text-neutral-400">Belum ada aktivitas. Tambahkan di atas.</p>
+        {acts.length === 0 && (
+          <p className="text-sm text-neutral-400">
+            Belum ada aktivitas. Tambahkan di atas.
+          </p>
         )}
       </ul>
     </div>
