@@ -166,13 +166,13 @@ export function BudgetManager({
                 return (
                   <li
                     key={c.id}
-                    className="grid grid-cols-[1fr_110px_110px_110px] items-center gap-2 text-sm"
+                    className="grid grid-cols-[minmax(64px,1fr)_64px_64px_64px] items-center gap-1 text-sm sm:grid-cols-[1fr_110px_110px_110px] sm:gap-2"
                   >
-                    <span className="flex items-center gap-2 truncate">
-                      {c.name}
+                    <span className="flex min-w-0 items-center gap-1 truncate">
+                      <span className="truncate">{c.name}</span>
                       <button
                         onClick={() => removeCategory(c)}
-                        className="text-[10px] text-neutral-300 hover:text-red-500"
+                        className="shrink-0 text-[10px] text-neutral-300 hover:text-red-500"
                         title="Hapus kategori"
                       >
                         ✕
@@ -189,13 +189,13 @@ export function BudgetManager({
                         if (e.key === "Enter")
                           (e.target as HTMLInputElement).blur();
                       }}
-                      className="w-full rounded-lg border border-neutral-200 bg-white/60 px-2 py-1 text-right text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5"
+                      className="w-full min-w-0 rounded-lg border border-neutral-200 bg-white/60 px-1.5 py-1 text-right text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5 sm:px-2"
                     />
-                    <span className="text-right tabular-nums text-neutral-500">
+                    <span className="truncate text-right tabular-nums text-neutral-500">
                       {idr(c.actual)}
                     </span>
                     <span
-                      className={`text-right tabular-nums ${over ? "text-red-500" : "text-neutral-500"}`}
+                      className={`truncate text-right tabular-nums ${over ? "text-red-500" : "text-neutral-500"}`}
                     >
                       {idr(variance)}
                     </span>
