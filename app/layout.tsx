@@ -1,13 +1,26 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import NextTopLoader from "nextjs-toploader";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
 import { MobileNav } from "./mobile-nav";
+import { SwRegister } from "./sw-register";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AI Life OS",
   description: "Asisten AI untuk hari-harimu",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Life OS" },
+  icons: { apple: "/icons/icon-192.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0E0E13",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default async function RootLayout({
@@ -23,12 +36,18 @@ export default async function RootLayout({
   return (
     <html lang="id">
       <body>
-        <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 pb-24 pt-6 sm:px-6">
+        <NextTopLoader
+          color="#8B7CFF"
+          height={3}
+          showSpinner={false}
+          shadow="0 0 10px #8B7CFF"
+        />
+        <SwRegister />
+        <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 pb-10 pt-6 sm:px-6">
           <header className="mb-6 flex items-center justify-between gap-4">
             <span className="shrink-0 text-lg font-semibold tracking-tight">
               AI Life OS
             </span>
-            {/* Nav atas: hanya tampil di desktop. Di HP pakai bottom bar. */}
             {user && (
               <nav className="hidden flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-neutral-500 md:flex">
                 <Link
@@ -42,12 +61,6 @@ export default async function RootLayout({
                   className="hover:text-neutral-900 dark:hover:text-white"
                 >
                   Timeline
-                </Link>
-                <Link
-                  href="/habits"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  Habit
                 </Link>
                 <Link
                   href="/goals"
@@ -84,6 +97,18 @@ export default async function RootLayout({
                   className="hover:text-neutral-900 dark:hover:text-white"
                 >
                   Tabungan
+                </Link>
+                <Link
+                  href="/creator"
+                  className="hover:text-neutral-900 dark:hover:text-white"
+                >
+                  Creator
+                </Link>
+                <Link
+                  href="/books"
+                  className="hover:text-neutral-900 dark:hover:text-white"
+                >
+                  Buku
                 </Link>
                 <LogoutButton />
               </nav>

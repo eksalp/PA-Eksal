@@ -28,6 +28,13 @@ export default async function SavingsPage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
+  const { data: accounts } = await supabase
+    .from("accounts")
+    .select("id, name")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("created_at");
+
   const list = savings ?? [];
   const totalSaved = list.reduce(
     (s: number, g: any) => s + Number(g.saved_amount),
@@ -68,7 +75,11 @@ export default async function SavingsPage() {
         </div>
       </section>
 
-      <SavingsManager userId={user.id} savings={list} />
+      <SavingsManager
+        userId={user.id}
+        savings={list}
+        accounts={accounts ?? []}
+      />
     </div>
   );
 }

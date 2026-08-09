@@ -13,6 +13,7 @@ type Saving = {
   deadline: string | null;
   status: string;
 };
+type Account = { id: string; name: string };
 
 const idr = (n: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -20,6 +21,10 @@ const idr = (n: number) =>
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(n);
+const todayWIB = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
+  );
 
 function monthsUntil(deadline: string): number {
   const now = new Date();
@@ -30,27 +35,40 @@ function monthsUntil(deadline: string): number {
   return Math.max(1, months);
 }
 
+// tebak akun tabungan default (nama mengandung "tabung"/"saving")
+const guessSavingsAcc = (accs: Account[]) =>
+  accs.find((a) => /tabung|saving/i.test(a.name))?.id ?? "";
+
 export function SavingsManager({
   userId,
   savings,
+  accounts,
 }: {
   userId: string;
   savings: Saving[];
+  accounts: Account[];
 }) {
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
   const [monthly, setMonthly] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [contrib, setContrib] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+
+  // per-goal setor state
+  const [amt, setAmt] = useState<Record<string, string>>({});
+  const [fromAcc, setFromAcc] = useState<Record<string, string>>({});
+  const [toAcc, setToAcc] = useState<Record<string, string>>({});
 
   const router = useRouter();
   const supabase = createClient() as any;
 
+  const defaultTo =
+    guessSavingsAcc(accounts) || accounts[1]?.id || accounts[0]?.id || "";
+  const defaultFrom =
+    accounts.find((a) => a.id !== defaultTo)?.id ?? accounts[0]?.id ?? "";
+
   async function addGoal(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !target) return;
-    setBusy(true);
     const { error } = await supabase.from("savings_goals").insert({
       user_id: userId,
       name: name.trim(),
@@ -60,7 +78,6 @@ export function SavingsManager({
       deadline: deadline || null,
       status: "active",
     });
-    setBusy(false);
     if (error) return alert("Gagal: " + error.message);
     setName("");
     setTarget("");
@@ -69,17 +86,38 @@ export function SavingsManager({
     router.refresh();
   }
 
-  async function deposit(g: Saving) {
-    const amt = Number(contrib[g.id]);
-    if (!amt) return;
-    const newSaved = Math.max(0, Number(g.saved_amount) + amt);
+  async function setor(g: Saving) {
+    const amount = Number(amt[g.id]);
+    const src = fromAcc[g.id] ?? defaultFrom;
+    const dst = toAcc[g.id] ?? defaultTo;
+    if (!amount) return;
+    if (!src || !dst)
+      return alert("Pilih akun sumber & tabungan dulu (buat akun di Finance).");
+    if (src === dst) return alert("Akun sumber & tabungan harus beda.");
+
+    // 1) transfer: uang pindah dari akun sumber ke akun tabungan
+    const { error: e1 } = await supabase.from("transactions").insert({
+      user_id: userId,
+      account_id: src,
+      transfer_to_account_id: dst,
+      type: "transfer",
+      amount,
+      category: g.name,
+      note: `Nabung: ${g.name}`,
+      transaction_date: todayWIB(),
+    });
+    if (e1) return alert("Gagal transfer: " + e1.message);
+
+    // 2) update progress goal
+    const newSaved = Number(g.saved_amount) + amount;
     const status = newSaved >= Number(g.target_amount) ? "done" : "active";
-    const { error } = await supabase
+    const { error: e2 } = await supabase
       .from("savings_goals")
       .update({ saved_amount: newSaved, status })
       .eq("id", g.id);
-    if (error) return alert("Gagal: " + error.message);
-    setContrib((p) => ({ ...p, [g.id]: "" }));
+    if (e2) return alert("Gagal update goal: " + e2.message);
+
+    setAmt((p) => ({ ...p, [g.id]: "" }));
     router.refresh();
   }
 
@@ -94,7 +132,12 @@ export function SavingsManager({
   }
 
   async function remove(g: Saving) {
-    if (!confirm(`Hapus tabungan "${g.name}"?`)) return;
+    if (
+      !confirm(
+        `Hapus tabungan "${g.name}"? Riwayat transfernya tetap ada di Finance.`,
+      )
+    )
+      return;
     await supabase.from("savings_goals").delete().eq("id", g.id);
     router.refresh();
   }
@@ -104,6 +147,13 @@ export function SavingsManager({
 
   return (
     <>
+      {accounts.length < 2 && (
+        <div className="glass-card p-4 text-sm text-amber-600">
+          Buat minimal 2 akun di menu Finance dulu (mis. "BCA" & "Tabungan")
+          biar setor bisa jadi transfer beneran.
+        </div>
+      )}
+
       <section className="glass-card p-6">
         <h2 className="mb-3 text-sm font-medium text-neutral-500">
           Tambah Tabungan
@@ -138,8 +188,7 @@ export function SavingsManager({
             />
             <button
               type="submit"
-              disabled={busy}
-              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-white dark:text-neutral-900"
             >
               Tambah
             </button>
@@ -196,39 +245,57 @@ export function SavingsManager({
             </div>
             <div className="mt-1 flex justify-between text-xs text-neutral-400">
               <span>{pct}%</span>
-              {suggested && <span>Saran nabung: {idr(suggested)}/bulan</span>}
+              {suggested && <span>Saran: {idr(suggested)}/bulan</span>}
             </div>
 
-            {!done && (
-              <div className="mt-3 flex gap-2">
+            {!done && accounts.length >= 2 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <input
                   type="number"
                   placeholder="Setor (Rp)"
-                  value={contrib[g.id] ?? ""}
-                  onChange={(e) =>
-                    setContrib((p) => ({ ...p, [g.id]: e.target.value }))
+                  value={
+                    amt[g.id] ??
+                    (g.monthly_target ? String(g.monthly_target) : "")
                   }
-                  className={`w-40 ${inputCls}`}
+                  onChange={(e) =>
+                    setAmt((p) => ({ ...p, [g.id]: e.target.value }))
+                  }
+                  className={`w-32 ${inputCls}`}
                 />
+                <span className="text-xs text-neutral-400">dari</span>
+                <select
+                  value={fromAcc[g.id] ?? defaultFrom}
+                  onChange={(e) =>
+                    setFromAcc((p) => ({ ...p, [g.id]: e.target.value }))
+                  }
+                  className={inputCls}
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-neutral-400">ke</span>
+                <select
+                  value={toAcc[g.id] ?? defaultTo}
+                  onChange={(e) =>
+                    setToAcc((p) => ({ ...p, [g.id]: e.target.value }))
+                  }
+                  className={inputCls}
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
                 <button
-                  onClick={() => deposit(g)}
+                  onClick={() => setor(g)}
                   className="rounded-lg bg-emerald-500 px-4 py-2 text-sm text-white"
                 >
                   + Setor
                 </button>
-                {g.monthly_target && (
-                  <button
-                    onClick={() => {
-                      setContrib((p) => ({
-                        ...p,
-                        [g.id]: String(g.monthly_target),
-                      }));
-                    }}
-                    className="rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-500 dark:border-white/10"
-                  >
-                    Isi {idr(Number(g.monthly_target))}
-                  </button>
-                )}
               </div>
             )}
           </section>

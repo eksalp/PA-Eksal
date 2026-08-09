@@ -112,9 +112,14 @@ export default async function FinancePage() {
         categories={categories ?? []}
       />
 
-      <DebtManager userId={user.id} debts={debts ?? []} />
+      <DebtManager userId={user.id} debts={debts ?? []} accounts={acc} />
 
-      <AssetManager userId={user.id} assets={assets ?? []} />
+      <AssetManager
+        userId={user.id}
+        assets={assets ?? []}
+        accounts={acc}
+        categories={categories ?? []}
+      />
     </div>
   );
 }
