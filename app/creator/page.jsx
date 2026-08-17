@@ -148,10 +148,11 @@ export default function CreatorDashboard() {
   const [jobs, setJobs] = useState([]);
   const [snapshots, setSnapshots] = useState([]);
   const [links, setLinks] = useState([]);
+  const [freelanceLinks, setFreelanceLinks] = useState([]);
   const [currency, setCurrency] = useState("Rp");
 
   async function loadAll(uid) {
-    const [jr, sr, lr, cr] = await Promise.all([
+    const [jr, sr, lr, flr, cr] = await Promise.all([
       supabase
         .from("creator_jobs")
         .select("*")
@@ -168,6 +169,11 @@ export default function CreatorDashboard() {
         .eq("user_id", uid)
         .order("created_at"),
       supabase
+        .from("creator_freelance_links")
+        .select("*")
+        .eq("user_id", uid)
+        .order("created_at"),
+      supabase
         .from("creator_settings")
         .select("currency")
         .eq("user_id", uid)
@@ -176,6 +182,7 @@ export default function CreatorDashboard() {
     setJobs(jr.data ?? []);
     setSnapshots(sr.data ?? []);
     setLinks(lr.data ?? []);
+    setFreelanceLinks(flr.data ?? []);
     setCurrency(cr.data?.currency ?? "Rp");
   }
 
@@ -266,6 +273,31 @@ export default function CreatorDashboard() {
     await supabase.from("creator_links").delete().eq("id", id);
   }
 
+  async function addFreelanceLink(data) {
+    const { data: row, error } = await supabase
+      .from("creator_freelance_links")
+      .insert({
+        user_id: userId,
+        name: data.name,
+        url: data.url,
+        color: data.color,
+      })
+      .select()
+      .single();
+    if (error) return alert("Gagal: " + error.message);
+    setFreelanceLinks((l) => [...l, row]);
+  }
+  async function updateFreelanceLink(id, data) {
+    setFreelanceLinks((l) =>
+      l.map((x) => (x.id === id ? { ...x, ...data } : x)),
+    );
+    await supabase.from("creator_freelance_links").update(data).eq("id", id);
+  }
+  async function removeFreelanceLink(id) {
+    setFreelanceLinks((l) => l.filter((x) => x.id !== id));
+    await supabase.from("creator_freelance_links").delete().eq("id", id);
+  }
+
   async function setCurrencyValue(c) {
     setCurrency(c);
     await supabase
@@ -300,10 +332,12 @@ export default function CreatorDashboard() {
       supabase.from("creator_jobs").delete().eq("user_id", userId),
       supabase.from("creator_snapshots").delete().eq("user_id", userId),
       supabase.from("creator_links").delete().eq("user_id", userId),
+      supabase.from("creator_freelance_links").delete().eq("user_id", userId),
     ]);
     setJobs([]);
     setSnapshots([]);
     setLinks([]);
+    setFreelanceLinks([]);
   }
 
   const money = (n) => `${currency} ${grp(n)}`;
@@ -389,6 +423,7 @@ export default function CreatorDashboard() {
           {[
             ["overview", "Ringkasan"],
             ["links", "Link Affiliate"],
+            ["freelance", "Profil Freelance"],
             ["jobs", "Job Affiliate"],
             ["social", "Sosial Media"],
           ].map(([id, label]) => (
@@ -426,6 +461,22 @@ export default function CreatorDashboard() {
             onAdd={addLink}
             onUpdate={updateLink}
             onRemove={removeLink}
+            title="Tambah link affiliate"
+            listTitle="Program affiliate kamu"
+            namePlaceholder="misal: Micro1"
+            emptyText="Belum ada link. Tambahkan program affiliate yang kamu jalanin (Micro1, Mercor, dll) di atas — nanti muncul jadi kotak yang tinggal klik langsung ke dashboard-nya."
+          />
+        )}
+        {tab === "freelance" && (
+          <LinksTab
+            links={freelanceLinks}
+            onAdd={addFreelanceLink}
+            onUpdate={updateFreelanceLink}
+            onRemove={removeFreelanceLink}
+            title="Tambah profil freelance"
+            listTitle="Profil freelance kamu"
+            namePlaceholder="misal: Upwork"
+            emptyText="Belum ada link. Tambahkan profil freelance-mu (Upwork, Fiverr, portfolio, LinkedIn, dll) di atas — nanti muncul jadi kotak yang tinggal klik langsung ke profilnya."
           />
         )}
         {tab === "jobs" && (
@@ -1296,7 +1347,16 @@ const LINK_COLORS = [
   "#FFD166",
 ];
 
-function LinksTab({ links, onAdd, onUpdate, onRemove }) {
+function LinksTab({
+  links,
+  onAdd,
+  onUpdate,
+  onRemove,
+  title,
+  listTitle,
+  namePlaceholder,
+  emptyText,
+}) {
   const blank = () => ({ name: "", url: "", color: LINK_COLORS[0] });
   const [form, setForm] = useState(blank);
   const [editingId, setEditingId] = useState(null);
@@ -1336,23 +1396,23 @@ function LinksTab({ links, onAdd, onUpdate, onRemove }) {
     <div className="cd-grid">
       <section className="cd-card" style={{ gridColumn: "1 / -1" }}>
         <div className="cd-cardhead">
-          <h3>{editingId ? "Edit link" : "Tambah link affiliate"}</h3>
+          <h3>{editingId ? "Edit link" : title}</h3>
         </div>
         <div className="cd-form cd-form--link">
           <label className="cd-field">
-            <span>Nama program</span>
+            <span>Nama</span>
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="misal: Micro1"
+              placeholder={namePlaceholder}
             />
           </label>
           <label className="cd-field cd-field--wide">
-            <span>Link dashboard</span>
+            <span>Link</span>
             <input
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
-              placeholder="app.micro1.ai/dashboard"
+              placeholder="https://..."
             />
           </label>
           <div className="cd-field">
@@ -1391,7 +1451,7 @@ function LinksTab({ links, onAdd, onUpdate, onRemove }) {
 
       <section className="cd-card" style={{ gridColumn: "1 / -1" }}>
         <div className="cd-cardhead">
-          <h3>Program affiliate kamu</h3>
+          <h3>{listTitle}</h3>
           <span className="cd-hint">{links.length} link</span>
         </div>
         {links.length === 0 ? (
@@ -1400,9 +1460,7 @@ function LinksTab({ links, onAdd, onUpdate, onRemove }) {
               <Rocket size={22} />
             </span>
             <p className="cd-note" style={{ maxWidth: 400 }}>
-              Belum ada link. Tambahkan program affiliate yang kamu jalanin
-              (Micro1, Mercor, dll) di atas — nanti muncul jadi kotak yang
-              tinggal klik langsung ke dashboard-nya.
+              {emptyText}
             </p>
           </div>
         ) : (
@@ -1439,7 +1497,7 @@ const tooltipStyle = {
 
 function StyleTag() {
   return (
-    <style suppressHydrationWarning>{`
+    <style>{`
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 *{box-sizing:border-box}
 .metric{font-family:var(--display);font-feature-settings:"tnum";letter-spacing:-.01em}

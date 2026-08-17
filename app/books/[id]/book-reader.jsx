@@ -135,6 +135,7 @@ export default function BookReader({ book }) {
   }
   function onTouchMove(e) {
     if (e.touches.length === 2 && pinch.current.active) {
+      e.preventDefault();
       const d = twoDist(e.touches);
       const z = Math.min(
         4,
@@ -234,7 +235,7 @@ export default function BookReader({ book }) {
         <>
           <div
             className="overflow-auto rounded-xl bg-neutral-100 p-2 dark:bg-white/5"
-            style={{ maxHeight: normalH + 16 }}
+            style={{ maxHeight: normalH + 16, touchAction: "pan-y" }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
@@ -322,6 +323,7 @@ export default function BookReader({ book }) {
 
           <div
             className="relative flex-1 overflow-auto"
+            style={{ touchAction: "pan-y" }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
