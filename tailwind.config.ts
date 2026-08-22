@@ -1,22 +1,25 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        surface: {
-          light: "#ffffff",
-          dark: "#0b0b0f",
+        brand: {
+          DEFAULT: "#4F78FF",
+          to: "#7C5CFC",
         },
       },
-      backdropBlur: {
-        xs: "2px",
+      borderRadius: {
+        "2xl": "20px",
       },
     },
   },
   plugins: [],
 };
-
 export default config;

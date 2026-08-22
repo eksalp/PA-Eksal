@@ -2,16 +2,364 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light dark;
+/* ============================================================
+   AI Life OS — Design System
+   Tema: Blue/Purple gradient, clean cards, modern finance app
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Brand */
+    --brand-from: #4f78ff;
+    --brand-to: #7c5cfc;
+    --brand-mid: #6366f1;
+
+    /* Surface (light) */
+    --bg: #f2f4f8;
+    --surface: #ffffff;
+    --surface-2: #f7f9fc;
+    --border: #e8ecf4;
+    --border-2: #d1d9ec;
+
+    /* Text (light) */
+    --text: #0f1523;
+    --text-2: #4a5578;
+    --text-3: #8b95b3;
+
+    /* Semantic */
+    --green: #22c55e;
+    --green-bg: #dcfce7;
+    --red: #ef4444;
+    --red-bg: #fee2e2;
+    --amber: #f59e0b;
+    --amber-bg: #fef3c7;
+
+    /* Shadow */
+    --shadow-sm:
+      0 1px 3px rgba(79, 120, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md:
+      0 4px 16px rgba(79, 120, 255, 0.1), 0 2px 6px rgba(0, 0, 0, 0.04);
+    --shadow-lg:
+      0 8px 32px rgba(79, 120, 255, 0.14), 0 4px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  .dark {
+    --bg: #0d1117;
+    --surface: #161b27;
+    --surface-2: #1c2333;
+    --border: #252e42;
+    --border-2: #2e3a52;
+
+    --text: #e8edf8;
+    --text-2: #8b95b3;
+    --text-3: #4a5578;
+
+    --green: #4ade80;
+    --green-bg: rgba(74, 222, 128, 0.12);
+    --red: #f87171;
+    --red-bg: rgba(248, 113, 113, 0.12);
+    --amber: #fbbf24;
+    --amber-bg: rgba(251, 191, 36, 0.12);
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.45);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family:
+      -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-2);
+    border-radius: 99px;
+  }
 }
 
-body {
-  @apply bg-neutral-50 text-neutral-900 dark:bg-[#0b0b0f] dark:text-neutral-100;
-}
+@layer components {
+  /* ---- Card ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow-sm);
+  }
 
-/* Kartu gaya glassmorphism dipakai di dashboard — sesuai UI style di brief */
-.glass-card {
-  @apply rounded-2xl border border-white/20 bg-white/60 shadow-sm backdrop-blur-md
-    dark:border-white/10 dark:bg-white/5;
+  /* Alias untuk kompabilitas sama kode lama */
+  .glass-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ---- Gradient card (kayak balance card di gambar) ---- */
+  .card-gradient {
+    background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+    border-radius: 20px;
+    color: #fff;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ---- Badge ---- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .badge-green {
+    background: var(--green-bg);
+    color: var(--green);
+  }
+  .badge-red {
+    background: var(--red-bg);
+    color: var(--red);
+  }
+  .badge-amber {
+    background: var(--amber-bg);
+    color: var(--amber);
+  }
+  .badge-blue {
+    background: rgba(79, 120, 255, 0.12);
+    color: var(--brand-from);
+  }
+
+  /* ---- Button primary ---- */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    transition:
+      opacity 0.15s,
+      transform 0.1s;
+  }
+  .btn-primary:hover {
+    opacity: 0.92;
+  }
+  .btn-primary:active {
+    transform: scale(0.97);
+  }
+
+  /* ---- Button ghost ---- */
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
+  }
+  .btn-ghost:hover {
+    border-color: var(--brand-from);
+    color: var(--brand-from);
+  }
+
+  /* ---- Input ---- */
+  .input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
+  .input:focus {
+    border-color: var(--brand-from);
+    box-shadow: 0 0 0 3px rgba(79, 120, 255, 0.12);
+  }
+  .input::placeholder {
+    color: var(--text-3);
+  }
+
+  /* ---- Select ---- */
+  select.input {
+    cursor: pointer;
+  }
+
+  /* ---- Stat number (angka besar ala balance card) ---- */
+  .stat-num {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  /* ---- Progress bar ---- */
+  .progress-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 99px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--brand-from), var(--brand-to));
+    transition: width 0.4s ease;
+  }
+  .progress-fill-green {
+    background: var(--green);
+  }
+  .progress-fill-red {
+    background: var(--red);
+  }
+  .progress-fill-amber {
+    background: var(--amber);
+  }
+
+  /* ---- Section label ---- */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+  }
+
+  /* ---- Icon button (bulat) ---- */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      border-color 0.15s;
+  }
+  .icon-btn:hover {
+    background: var(--border);
+    border-color: var(--border-2);
+  }
+
+  /* ---- Quick action tile (kayak tombol Top up / Send di gambar) ---- */
+  .action-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      border-color 0.15s,
+      transform 0.1s;
+    font-size: 12px;
+    color: var(--text-2);
+    font-weight: 500;
+  }
+  .action-tile:hover {
+    border-color: var(--brand-from);
+    color: var(--brand-from);
+    background: rgba(79, 120, 255, 0.06);
+  }
+  .action-tile:active {
+    transform: scale(0.95);
+  }
+
+  /* ---- List row ---- */
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .list-row:last-child {
+    border-bottom: none;
+  }
+
+  /* ---- Gradient text ---- */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ---- Tab pill ---- */
+  .tab-pill {
+    display: flex;
+    gap: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+  }
+  .tab-pill-item {
+    flex: 1;
+    padding: 7px 14px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    transition: 0.15s;
+    white-space: nowrap;
+  }
+  .tab-pill-item.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
 }

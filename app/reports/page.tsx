@@ -2,6 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DateRangePicker } from "./date-range-picker";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const pad = (n: number) => String(n).padStart(2, "0");
 const rupiah = (n: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -30,8 +33,6 @@ const MONTH_LABEL = [
   "November",
   "Desember",
 ];
-
-type HabitRow = { name: string; daysHit: number; pct: number };
 
 function daysBetween(startStr: string, endStr: string): Date[] {
   const [sy, sm, sd] = startStr.split("-").map(Number);
@@ -63,13 +64,12 @@ export default async function ReportsPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
+  if (!user)
     return (
       <div className="glass-card p-6 text-sm text-neutral-500">
         Silakan login dulu.
       </div>
     );
-  }
 
   const today = jakartaToday();
   const isCustom = isDate(searchParams?.from) && isDate(searchParams?.to);
@@ -90,7 +90,6 @@ export default async function ReportsPage({
   const effEnd = days.length ? keyOf(days[days.length - 1]) : endStr;
   const wide = days.length > 10;
 
-  // Budget month = bulan dari tanggal akhir periode
   const bym = effEnd.slice(0, 7);
   const [by, bm] = bym.split("-").map(Number);
   const bMonthStart = `${bym}-01`;
@@ -98,8 +97,6 @@ export default async function ReportsPage({
 
   const [
     { data: activities },
-    { data: habits },
-    { data: logs },
     { data: txns },
     { data: accounts },
     { data: assets },
@@ -116,17 +113,6 @@ export default async function ReportsPage({
       .eq("user_id", user.id)
       .gte("scheduled_date", startStr)
       .lte("scheduled_date", effEnd),
-    supabase
-      .from("habits")
-      .select("id, name")
-      .eq("user_id", user.id)
-      .eq("is_active", true),
-    supabase
-      .from("habit_logs")
-      .select("log_date, habit_id, completed_count")
-      .eq("user_id", user.id)
-      .gte("log_date", startStr)
-      .lte("log_date", effEnd),
     supabase
       .from("transactions")
       .select("type, amount, category, transaction_date")
@@ -150,7 +136,7 @@ export default async function ReportsPage({
       .eq("user_id", user.id),
     supabase
       .from("goals")
-      .select("title, current_value, target_value, unit, status")
+      .select("title, current_value, target_value, status")
       .eq("user_id", user.id)
       .neq("status", "archived")
       .limit(6),
@@ -176,19 +162,12 @@ export default async function ReportsPage({
   const totalAct = acts.length;
   const doneAct = acts.filter((a: any) => a.status === "completed").length;
   const actPct = totalAct ? Math.round((doneAct / totalAct) * 100) : 0;
-  const activeHabits = habits?.length ?? 0;
 
   const perDay = days.map((d) => {
     const key = keyOf(d);
-    const dayActs = acts.filter((a: any) => d10(a.scheduled_date) === key);
-    const dayDone = dayActs.filter((a: any) => a.status === "completed").length;
-    const habitIds = new Set(
-      (logs ?? [])
-        .filter(
-          (l: any) => d10(l.log_date) === key && Number(l.completed_count) > 0,
-        )
-        .map((l: any) => l.habit_id),
-    );
+    const dayDone = acts.filter(
+      (a: any) => d10(a.scheduled_date) === key && a.status === "completed",
+    ).length;
     return {
       label: wide
         ? String(d.getUTCDate())
@@ -197,22 +176,9 @@ export default async function ReportsPage({
             weekday: "short",
           }).format(d),
       done: dayDone,
-      habitPct: activeHabits
-        ? Math.round((habitIds.size / activeHabits) * 100)
-        : 0,
     };
   });
   const maxDone = Math.max(1, ...perDay.map((p) => p.done));
-
-  const habitSlots = activeHabits * days.length;
-  const habitFilled = new Set(
-    (logs ?? [])
-      .filter((l: any) => Number(l.completed_count) > 0)
-      .map((l: any) => `${d10(l.log_date)}:${l.habit_id}`),
-  ).size;
-  const habitRate = habitSlots
-    ? Math.round((habitFilled / habitSlots) * 100)
-    : 0;
 
   const income = (txns ?? [])
     .filter((t: any) => t.type === "income")
@@ -234,7 +200,6 @@ export default async function ReportsPage({
     .slice(0, 5);
   const maxCat = Math.max(1, ...topCats.map(([, v]) => v));
 
-  // ---- Posisi kekayaan (snapshot saat ini) ----
   const totalCash = (accounts ?? []).reduce(
     (s: number, a: any) => s + Number(a.current_balance),
     0,
@@ -255,7 +220,6 @@ export default async function ReportsPage({
   );
   const netWorth = totalCash + totalAssets + totalPiutang - totalUtang;
 
-  // ---- Budget adherence (bulan dari akhir periode) ----
   const groupOf: Record<string, string> = {};
   (cats ?? []).forEach((c: any) => (groupOf[c.id] = c.group_type));
   const budgetedExpense = (budgetRows ?? [])
@@ -269,25 +233,6 @@ export default async function ReportsPage({
     ? Math.round((actualExpenseMonth / budgetedExpense) * 100)
     : 0;
 
-  // ---- Rincian per habit ----
-  const habitRows: HabitRow[] = (habits ?? [])
-    .map((h: any) => {
-      const daysHit = new Set(
-        (logs ?? [])
-          .filter(
-            (l: any) => l.habit_id === h.id && Number(l.completed_count) > 0,
-          )
-          .map((l: any) => d10(l.log_date)),
-      ).size;
-      return {
-        name: h.name,
-        daysHit,
-        pct: days.length ? Math.round((daysHit / days.length) * 100) : 0,
-      };
-    })
-    .sort((a: HabitRow, b: HabitRow) => b.pct - a.pct);
-
-  // ---- No-spend days dalam periode ----
   const spendDays = new Set(
     (txns ?? [])
       .filter((t: any) => t.type === "expense")
@@ -303,8 +248,6 @@ export default async function ReportsPage({
       month: "short",
       year: "numeric",
     }).format(new Date(s + "T00:00:00Z"));
-
-  const barTrack = "flex h-32 items-end";
 
   return (
     <div className="space-y-6">
@@ -337,7 +280,6 @@ export default async function ReportsPage({
         </div>
       </section>
 
-      {/* Posisi kekayaan */}
       <section className="glass-card p-6">
         <h2 className="mb-1 text-sm font-medium text-neutral-500">
           Posisi Kekayaan (saat ini)
@@ -376,19 +318,13 @@ export default async function ReportsPage({
         </div>
       </section>
 
-      {/* Ringkasan periode */}
-      <section className="grid grid-cols-3 gap-3">
+      <section className="grid grid-cols-2 gap-3">
         <div className="glass-card p-4">
           <div className="text-xs text-neutral-500">Aktivitas selesai</div>
           <div className="mt-1 text-2xl font-semibold">{actPct}%</div>
           <div className="text-xs text-neutral-400">
             {doneAct}/{totalAct}
           </div>
-        </div>
-        <div className="glass-card p-4">
-          <div className="text-xs text-neutral-500">Habit rate</div>
-          <div className="mt-1 text-2xl font-semibold">{habitRate}%</div>
-          <div className="text-xs text-neutral-400">{activeHabits} habit</div>
         </div>
         <div className="glass-card p-4">
           <div className="text-xs text-neutral-500">Net finance</div>
@@ -400,7 +336,6 @@ export default async function ReportsPage({
         </div>
       </section>
 
-      {/* Budget adherence */}
       <section className="glass-card p-6">
         <h2 className="mb-3 text-sm font-medium text-neutral-500">
           Budget vs Realisasi — {MONTH_LABEL[bm - 1]} {by}
@@ -428,7 +363,6 @@ export default async function ReportsPage({
         </div>
       </section>
 
-      {/* Aktivitas per hari */}
       <section className="glass-card p-6">
         <h2 className="mb-4 text-sm font-medium text-neutral-500">
           Aktivitas Selesai per Hari
@@ -436,7 +370,7 @@ export default async function ReportsPage({
         <div className="flex items-end gap-1">
           {perDay.map((p, i) => (
             <div key={i} className="flex-1">
-              <div className={barTrack}>
+              <div className="flex h-32 items-end">
                 <div
                   className="w-full rounded-t bg-neutral-900 dark:bg-white"
                   style={{
@@ -457,61 +391,6 @@ export default async function ReportsPage({
         </div>
       </section>
 
-      {/* Habit per hari */}
-      <section className="glass-card p-6">
-        <h2 className="mb-4 text-sm font-medium text-neutral-500">
-          Habit Completion per Hari (%)
-        </h2>
-        <div className="flex items-end gap-1">
-          {perDay.map((p, i) => (
-            <div key={i} className="flex-1">
-              <div className={barTrack}>
-                <div
-                  className="w-full rounded-t bg-emerald-500"
-                  style={{
-                    height: p.habitPct > 0 ? `max(${p.habitPct}%, 4px)` : "0%",
-                  }}
-                />
-              </div>
-              {(!wide || i % 5 === 0) && (
-                <div className="mt-1 text-center text-[10px] text-neutral-400">
-                  {p.label}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Rincian per habit */}
-      <section className="glass-card p-6">
-        <h2 className="mb-3 text-sm font-medium text-neutral-500">
-          Rincian per Habit
-        </h2>
-        <ul className="space-y-2">
-          {habitRows.map((h, i) => (
-            <li key={i} className="text-sm">
-              <div className="mb-1 flex justify-between">
-                <span>{h.name}</span>
-                <span className="text-neutral-400">
-                  {h.daysHit}/{days.length} hari · {h.pct}%
-                </span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
-                <div
-                  className={`h-full rounded-full ${h.pct >= 70 ? "bg-emerald-500" : h.pct >= 40 ? "bg-amber-400" : "bg-red-400"}`}
-                  style={{ width: `${h.pct}%` }}
-                />
-              </div>
-            </li>
-          ))}
-          {habitRows.length === 0 && (
-            <p className="text-sm text-neutral-400">Belum ada habit.</p>
-          )}
-        </ul>
-      </section>
-
-      {/* No-spend + Goals */}
       <section className="glass-card p-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-medium text-neutral-500">
@@ -550,7 +429,6 @@ export default async function ReportsPage({
         </ul>
       </section>
 
-      {/* Finance income/expense */}
       <section className="glass-card p-6">
         <h2 className="mb-4 text-sm font-medium text-neutral-500">
           Arus Kas Periode Ini
@@ -592,7 +470,7 @@ export default async function ReportsPage({
         )}
         <p className="mt-3 text-xs text-neutral-400">
           Catatan: transfer, nabung, & beli aset tidak dihitung sebagai
-          pemasukan/pengeluaran (cuma pindah wujud).
+          pemasukan/pengeluaran.
         </p>
       </section>
     </div>

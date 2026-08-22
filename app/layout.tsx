@@ -16,12 +16,25 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0E0E13",
+  themeColor: "#4F78FF",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false,
 };
+
+const NAV_ITEMS = [
+  { href: "/", label: "Dashboard" },
+  { href: "/activities", label: "Timeline" },
+  { href: "/goals", label: "Goals" },
+  { href: "/reports", label: "Reports" },
+  { href: "/budget", label: "Budget" },
+  { href: "/finance", label: "Finance" },
+  { href: "/no-spend", label: "No Spend" },
+  { href: "/savings", label: "Tabungan" },
+  { href: "/creator", label: "Creator" },
+  { href: "/books", label: "Buku" },
+  { href: "/documents", label: "Dokumen" },
+];
 
 export default async function RootLayout({
   children,
@@ -34,89 +47,106 @@ export default async function RootLayout({
   } = await supabase.auth.getUser();
 
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <body>
         <NextTopLoader
-          color="#8B7CFF"
+          color="#4F78FF"
           height={3}
           showSpinner={false}
-          shadow="0 0 10px #8B7CFF"
+          shadow="0 0 10px #4F78FF,0 0 5px #7C5CFC"
         />
         <SwRegister />
-        <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 pb-10 pt-6 sm:px-6">
-          <header className="mb-6 flex items-center justify-between gap-4">
-            <span className="shrink-0 text-lg font-semibold tracking-tight">
-              AI Life OS
-            </span>
-            {user && (
-              <nav className="hidden flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-neutral-500 md:flex">
+
+        {/* Desktop sidebar (md+) */}
+        {user && (
+          <aside
+            className="fixed inset-y-0 left-0 z-40 hidden w-56 flex-col border-r md:flex"
+            style={{
+              background: "var(--surface)",
+              borderColor: "var(--border)",
+            }}
+          >
+            {/* Logo */}
+            <div className="flex h-16 items-center gap-2.5 px-5">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-xl"
+                style={{
+                  background: "linear-gradient(135deg,#4F78FF,#7C5CFC)",
+                }}
+              >
+                <span className="text-sm font-bold text-white">A</span>
+              </div>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "var(--text)" }}
+              >
+                AI Life OS
+              </span>
+            </div>
+
+            {/* Nav */}
+            <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4 pt-2">
+              {NAV_ITEMS.map((it) => (
                 <Link
-                  href="/"
-                  className="hover:text-neutral-900 dark:hover:text-white"
+                  key={it.href}
+                  href={it.href}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
+                  style={{ color: "var(--text-2)" }}
                 >
-                  Dashboard
+                  {it.label}
                 </Link>
-                <Link
-                  href="/activities"
-                  className="hover:text-neutral-900 dark:hover:text-white"
+              ))}
+            </nav>
+
+            {/* Logout */}
+            <div
+              className="border-t p-3"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <LogoutButton />
+            </div>
+          </aside>
+        )}
+
+        {/* Main content */}
+        <div className={user ? "md:pl-56" : ""}>
+          {/* Top bar mobile */}
+          {user && (
+            <header
+              className="sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 md:hidden"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-lg"
+                  style={{
+                    background: "linear-gradient(135deg,#4F78FF,#7C5CFC)",
+                  }}
                 >
-                  Timeline
-                </Link>
-                <Link
-                  href="/goals"
-                  className="hover:text-neutral-900 dark:hover:text-white"
+                  <span className="text-xs font-bold text-white">A</span>
+                </div>
+                <span
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--text)" }}
                 >
-                  Goals
-                </Link>
-                <Link
-                  href="/reports"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  Reports
-                </Link>
-                <Link
-                  href="/budget"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  Budget
-                </Link>
-                <Link
-                  href="/finance"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  Finance
-                </Link>
-                <Link
-                  href="/no-spend"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  No Spend
-                </Link>
-                <Link
-                  href="/savings"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  Tabungan
-                </Link>
-                <Link
-                  href="/creator"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  Creator
-                </Link>
-                <Link
-                  href="/books"
-                  className="hover:text-neutral-900 dark:hover:text-white"
-                >
-                  Buku
-                </Link>
-                <LogoutButton />
-              </nav>
-            )}
-          </header>
-          <main className="flex-1">{children}</main>
+                  AI Life OS
+                </span>
+              </div>
+              <MobileNav />
+            </header>
+          )}
+
+          {/* Page content */}
+          <main
+            className="mx-auto max-w-4xl px-4 py-6 sm:px-6"
+            style={{ minHeight: "calc(100vh - 56px)" }}
+          >
+            {children}
+          </main>
         </div>
-        {user && <MobileNav />}
       </body>
     </html>
   );

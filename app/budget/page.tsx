@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { BudgetManager } from "./budget-manager";
 
+// Paksa render per-request — cegah Vercel nge-cache halaman ini,
+// yang bisa bikin bulan lain kelihatan nampilin data bulan lama.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function monthRange(monthStr: string) {
   const [y, m] = monthStr.split("-").map(Number);
   const start = `${monthStr}-01`;
@@ -143,3 +148,4 @@ export default async function BudgetPage({
     </div>
   );
 }
+  

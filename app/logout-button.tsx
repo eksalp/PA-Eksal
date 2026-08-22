@@ -1,16 +1,12 @@
 "use client";
-
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export function LogoutButton() {
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
-  async function handleLogout() {
-    setLoading(true);
+  async function logout() {
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
@@ -18,11 +14,11 @@ export function LogoutButton() {
 
   return (
     <button
-      onClick={handleLogout}
-      disabled={loading}
-      className="text-sm text-neutral-500 hover:text-neutral-900 disabled:opacity-40 dark:hover:text-white"
+      onClick={logout}
+      className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors"
+      style={{ color: "var(--text-3)" }}
     >
-      {loading ? "Keluar…" : "Keluar"}
+      Keluar
     </button>
   );
 }

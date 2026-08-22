@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const rupiah = (n: number) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",

@@ -16,6 +16,7 @@ const ITEMS = [
   { href: "/savings", label: "Tabungan" },
   { href: "/creator", label: "Creator" },
   { href: "/books", label: "Buku" },
+  { href: "/documents", label: "Dokumen" },
 ];
 
 export function MobileNav() {
@@ -34,57 +35,100 @@ export function MobileNav() {
   }
 
   return (
-    <div className="md:hidden">
-      {/* Tombol burger */}
+    <>
+      {/* Burger button */}
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Menu"
-        className="fixed right-4 top-5 z-50 flex h-10 w-10 flex-col items-center justify-center gap-[5px] rounded-lg border border-neutral-200 bg-white/85 backdrop-blur-lg dark:border-white/10 dark:bg-neutral-900/85"
+        className="flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-xl"
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+        }}
       >
         <span
-          className={`block h-0.5 w-5 bg-neutral-800 transition dark:bg-white ${open ? "translate-y-[7px] rotate-45" : ""}`}
+          className={`block h-0.5 w-4.5 rounded transition-all ${open ? "translate-y-[7px] rotate-45" : ""}`}
+          style={{ background: "var(--text-2)" }}
         />
         <span
-          className={`block h-0.5 w-5 bg-neutral-800 transition dark:bg-white ${open ? "opacity-0" : ""}`}
+          className={`block h-0.5 w-4.5 rounded transition-all ${open ? "opacity-0" : ""}`}
+          style={{ background: "var(--text-2)" }}
         />
         <span
-          className={`block h-0.5 w-5 bg-neutral-800 transition dark:bg-white ${open ? "-translate-y-[7px] -rotate-45" : ""}`}
+          className={`block h-0.5 w-4.5 rounded transition-all ${open ? "-translate-y-[7px] -rotate-45" : ""}`}
+          style={{ background: "var(--text-2)" }}
         />
       </button>
 
-      {/* Overlay + drawer */}
+      {/* Overlay */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/30"
+          className="fixed inset-0 z-50 flex justify-end"
+          style={{ background: "rgba(0,0,0,.4)" }}
           onClick={() => setOpen(false)}
         >
+          {/* Drawer */}
           <nav
-            className="absolute right-0 top-0 flex h-full w-60 flex-col gap-1 border-l border-neutral-200 bg-white p-6 pt-20 dark:border-white/10 dark:bg-neutral-900"
+            className="flex h-full w-64 flex-col overflow-y-auto px-3 py-6 shadow-xl"
+            style={{
+              background: "var(--surface)",
+              borderLeft: "1px solid var(--border)",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            {ITEMS.map((it) => (
-              <Link
-                key={it.href}
-                href={it.href}
-                onClick={() => setOpen(false)}
-                className={`rounded-lg px-3 py-2.5 text-sm ${
-                  isActive(it.href)
-                    ? "bg-neutral-100 font-medium text-neutral-900 dark:bg-white/10 dark:text-white"
-                    : "text-neutral-500"
-                }`}
+            {/* Logo */}
+            <div className="mb-4 flex items-center gap-2.5 px-2">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-xl"
+                style={{
+                  background: "linear-gradient(135deg,#4F78FF,#7C5CFC)",
+                }}
               >
-                {it.label}
-              </Link>
-            ))}
-            <button
-              onClick={logout}
-              className="mt-2 rounded-lg px-3 py-2.5 text-left text-sm text-neutral-500"
+                <span className="text-sm font-bold text-white">A</span>
+              </div>
+              <span className="font-semibold" style={{ color: "var(--text)" }}>
+                AI Life OS
+              </span>
+            </div>
+
+            <div className="space-y-0.5">
+              {ITEMS.map((it) => (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
+                  style={
+                    isActive(it.href)
+                      ? {
+                          background: "rgba(79,120,255,.1)",
+                          color: "#4F78FF",
+                        }
+                      : {
+                          color: "var(--text-2)",
+                        }
+                  }
+                >
+                  {it.label}
+                </Link>
+              ))}
+            </div>
+
+            <div
+              className="mt-auto pt-4"
+              style={{ borderTop: "1px solid var(--border)" }}
             >
-              Keluar
-            </button>
+              <button
+                onClick={logout}
+                className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors"
+                style={{ color: "var(--text-3)" }}
+              >
+                Keluar
+              </button>
+            </div>
           </nav>
         </div>
       )}
-    </div>
+    </>
   );
 }
