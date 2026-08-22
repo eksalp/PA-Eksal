@@ -82,13 +82,7 @@ export default async function BudgetPage({
 
   const actualMap: Record<string, number> = {};
   (txns ?? []).forEach((t: any) => {
-    // Transfer antar akun biasa selalu punya category = null, jadi otomatis
-    // terlewat di sini. Yang punya category di transaksi bertipe "transfer"
-    // hanya pembelian aset (lihat asset-manager.tsx) — itu harus tetap
-    // dihitung sebagai realisasi kategori budgetnya (mis. "Aset").
-    if (!t.category) return;
-    const normType = t.type === "income" ? "income" : "expense";
-    const key = `${t.category.toLowerCase()}|${normType}`;
+    const key = `${(t.category || "").toLowerCase()}|${t.type}`;
     actualMap[key] = (actualMap[key] || 0) + Number(t.amount);
   });
 
@@ -140,7 +134,12 @@ export default async function BudgetPage({
         </p>
       </section>
 
-      <BudgetManager userId={user.id} month={start} categories={catsWithData} />
+      <BudgetManager
+        key={start}
+        userId={user.id}
+        month={start}
+        categories={catsWithData}
+      />
     </div>
   );
 }
