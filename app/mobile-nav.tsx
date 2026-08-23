@@ -47,15 +47,15 @@ export function MobileNav() {
         }}
       >
         <span
-          className={`block h-0.5 w-4.5 rounded transition-all ${open ? "translate-y-[7px] rotate-45" : ""}`}
+          className={`block h-0.5 w-[18px] rounded transition-all ${open ? "translate-y-[7px] rotate-45" : ""}`}
           style={{ background: "var(--text-2)" }}
         />
         <span
-          className={`block h-0.5 w-4.5 rounded transition-all ${open ? "opacity-0" : ""}`}
+          className={`block h-0.5 w-[18px] rounded transition-all ${open ? "opacity-0" : ""}`}
           style={{ background: "var(--text-2)" }}
         />
         <span
-          className={`block h-0.5 w-4.5 rounded transition-all ${open ? "-translate-y-[7px] -rotate-45" : ""}`}
+          className={`block h-0.5 w-[18px] rounded transition-all ${open ? "-translate-y-[7px] -rotate-45" : ""}`}
           style={{ background: "var(--text-2)" }}
         />
       </button>

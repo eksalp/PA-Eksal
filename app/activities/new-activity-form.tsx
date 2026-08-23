@@ -56,7 +56,7 @@ export function NewActivityForm({
         disabled={loading}
         className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
       >
-        Tambah
+        +
       </button>
     </form>
   );
