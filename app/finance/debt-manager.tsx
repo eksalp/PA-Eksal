@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -8,6 +9,7 @@ type Debt = {
   id: string;
   direction: string; // utang | piutang
   counterparty_name: string;
+  original_amount: number;
   remaining_amount: number;
   due_date: string | null;
   status: string;
@@ -41,27 +43,29 @@ export function DebtManager({
   const [acc, setAcc] = useState("");
   const [payAcc, setPayAcc] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [showPaid, setShowPaid] = useState(false);
+  const busyRef = useRef(false);
 
   const router = useRouter();
   const supabase = createClient() as any;
 
-  // transfer "uang keluar/masuk akun". from/to boleh null.
   async function moveCash(
     from: string | null,
     to: string | null,
     amt: number,
     note: string,
   ) {
-    await supabase.from("transactions").insert({
+    const { error } = await supabase.from("transactions").insert({
       user_id: userId,
-      account_id: from,
-      transfer_to_account_id: to,
+      account_id: from || null,
+      transfer_to_account_id: to || null,
       type: "transfer",
       amount: amt,
       category: "Utang/Piutang",
       note,
       transaction_date: todayWIB(),
     });
+    if (error) throw new Error(error.message);
   }
 
   async function add(e: React.FormEvent) {
@@ -70,26 +74,40 @@ export function DebtManager({
     setBusy(true);
     const amt = Number(amount);
 
-    const { error } = await supabase.from("debts").insert({
-      user_id: userId,
-      direction,
-      counterparty_name: name.trim(),
-      original_amount: amt,
-      remaining_amount: amt,
-      due_date: due || null,
-      status: "active",
-    });
+    const { data: debt, error } = await supabase
+      .from("debts")
+      .insert({
+        user_id: userId,
+        direction,
+        counterparty_name: name.trim(),
+        original_amount: amt,
+        remaining_amount: amt,
+        due_date: due || null,
+        status: "active",
+      })
+      .select()
+      .single();
+
     if (error) {
       setBusy(false);
       return alert("Gagal: " + error.message);
     }
 
-    // Gerakkan cash jika akun dipilih:
+    // Gerakkan cash HANYA jika akun dipilih
     if (acc) {
-      if (direction === "piutang")
-        await moveCash(acc, null, amt, `Pinjamkan ke ${name.trim()}`); // cash keluar
-      else await moveCash(null, acc, amt, `Pinjam dari ${name.trim()}`); // cash masuk
+      try {
+        if (direction === "piutang") {
+          // Piutang: kamu pinjamkan uang → saldo keluar dari rekeningmu
+          await moveCash(acc, null, amt, `Pinjamkan ke ${name.trim()}`);
+        } else {
+          // Utang karena pinjam uang tunai → saldo masuk ke rekeningmu
+          await moveCash(null, acc, amt, `Pinjam uang dari ${name.trim()}`);
+        }
+      } catch (err: any) {
+        alert("Utang tercatat tapi gagal gerak saldo: " + err.message);
+      }
     }
+    // Jika acc kosong → utang non-tunai (misal: makan/belanja), tidak ada pergerakan saldo. Benar!
 
     setBusy(false);
     setName("");
@@ -100,51 +118,91 @@ export function DebtManager({
   }
 
   async function markPaid(d: Debt) {
-    const accountId = payAcc[d.id] ?? accounts[0]?.id ?? "";
-    const amt = Number(d.remaining_amount);
-    const label =
-      d.direction === "utang" ? "Bayar utang ke" : "Pelunasan piutang dari";
+    if (busyRef.current) return;
+    busyRef.current = true;
 
-    if (accountId) {
-      if (d.direction === "piutang")
-        await moveCash(null, accountId, amt, `${label} ${d.counterparty_name}`); // cash masuk
-      else
-        await moveCash(accountId, null, amt, `${label} ${d.counterparty_name}`); // cash keluar
+    const accountId =
+      payAcc[d.id] !== undefined ? payAcc[d.id] : (accounts[0]?.id ?? "");
+
+    const amt = Number(d.remaining_amount);
+    if (!amt) {
+      busyRef.current = false;
+      return alert("Jumlah sudah 0, tidak perlu dilunaskan.");
     }
 
-    const { error } = await supabase
-      .from("debts")
-      .update({ status: "paid", remaining_amount: 0 })
-      .eq("id", d.id);
-    if (error) return alert("Gagal: " + error.message);
-    router.refresh();
+    // Jika tidak ada akun dipilih, tandai lunas tanpa gerak saldo
+    // (untuk utang non-tunai yang tidak pernah gerak saldo di awal)
+    setBusy(true);
+    try {
+      if (accountId) {
+        if (d.direction === "utang") {
+          // Bayar utang → uang keluar dari rekening kamu
+          await moveCash(
+            accountId,
+            null,
+            amt,
+            `Bayar utang ke ${d.counterparty_name}`,
+          );
+        } else {
+          // Terima pelunasan piutang → uang masuk ke rekening kamu
+          await moveCash(
+            null,
+            accountId,
+            amt,
+            `Terima pelunasan dari ${d.counterparty_name}`,
+          );
+        }
+      }
+
+      // Update status: lunas tapi TETAP simpan original_amount dan remaining_amount
+      await supabase
+        .from("debts")
+        .update({ status: "paid", remaining_amount: 0 })
+        .eq("id", d.id);
+
+      router.refresh();
+    } catch (err: any) {
+      alert("Gagal: " + err.message);
+    } finally {
+      setBusy(false);
+      busyRef.current = false;
+    }
   }
 
   const inputCls =
     "rounded-lg border border-neutral-200 bg-white/60 px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5";
 
+  const activeDebts = debts.filter((d) => d.status !== "paid");
+  const paidDebts = debts.filter((d) => d.status === "paid");
+
   return (
     <div className="glass-card p-6">
+      {/* List AKTIF */}
       <h2 className="mb-3 text-sm font-medium text-neutral-500">
-        Utang & Piutang aktif
+        Utang & Piutang Aktif
       </h2>
-
       <ul className="mb-4 space-y-3">
-        {debts.map((d) => (
+        {activeDebts.map((d) => (
           <li
             key={d.id}
             className="flex flex-wrap items-center justify-between gap-2 text-sm"
           >
-            <span>
-              {d.direction === "utang" ? "Utang ke" : "Piutang dari"}{" "}
-              {d.counterparty_name}
+            <div>
+              <span>
+                {d.direction === "utang" ? "Utang ke" : "Piutang dari"}{" "}
+                <span className="font-medium">{d.counterparty_name}</span>
+              </span>
               {d.due_date && (
-                <span className="text-xs text-neutral-400">
-                  {" "}
-                  · tempo {d.due_date}
+                <span className="block text-xs text-neutral-400">
+                  Tempo: {d.due_date}
                 </span>
               )}
-            </span>
+              {d.original_amount !== d.remaining_amount && (
+                <span className="block text-xs text-neutral-400">
+                  Asli: {idr(Number(d.original_amount))}
+                </span>
+              )}
+            </div>
             <span className="flex items-center gap-2">
               <span
                 className={
@@ -161,6 +219,7 @@ export function DebtManager({
                   }
                   className="rounded-lg border border-neutral-200 bg-white/60 px-2 py-1 text-xs dark:border-white/10 dark:bg-white/5"
                 >
+                  <option value="">— tanpa gerak saldo</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
@@ -170,20 +229,63 @@ export function DebtManager({
               )}
               <button
                 onClick={() => markPaid(d)}
-                className="rounded-lg bg-emerald-500 px-3 py-1 text-xs text-white"
+                disabled={busy}
+                className="rounded-lg bg-emerald-500 px-3 py-1 text-xs text-white disabled:opacity-50"
               >
-                lunas
+                Lunas
               </button>
             </span>
           </li>
         ))}
-        {debts.length === 0 && (
+        {activeDebts.length === 0 && (
           <p className="text-sm text-neutral-400">
             Tidak ada utang/piutang aktif.
           </p>
         )}
       </ul>
 
+      {/* List LUNAS (collapsible) */}
+      {paidDebts.length > 0 && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowPaid((v) => !v)}
+            className="mb-2 flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600"
+          >
+            <span>{showPaid ? "▾" : "▸"}</span>
+            Riwayat Lunas ({paidDebts.length})
+          </button>
+          {showPaid && (
+            <ul className="space-y-2 rounded-xl bg-neutral-50 p-3 dark:bg-white/5">
+              {paidDebts.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm text-neutral-400"
+                >
+                  <div>
+                    <span>
+                      {d.direction === "utang" ? "Utang ke" : "Piutang dari"}{" "}
+                      <span className="font-medium">{d.counterparty_name}</span>
+                    </span>
+                    {d.due_date && (
+                      <span className="block text-xs">Tempo: {d.due_date}</span>
+                    )}
+                  </div>
+                  <span className="flex items-center gap-2">
+                    <span className="line-through">
+                      {idr(Number(d.original_amount))}
+                    </span>
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      ✓ Lunas
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Form tambah */}
       <form onSubmit={add} className="space-y-2">
         <div className="flex flex-wrap gap-2">
           <select
@@ -191,8 +293,8 @@ export function DebtManager({
             onChange={(e) => setDirection(e.target.value)}
             className={inputCls}
           >
-            <option value="utang">Utang (aku pinjam)</option>
-            <option value="piutang">Piutang (aku pinjamkan)</option>
+            <option value="utang">Utang (aku yang pinjam / berhutang)</option>
+            <option value="piutang">Piutang (aku yang meminjamkan)</option>
           </select>
           <input
             placeholder="Nama pihak"
@@ -215,15 +317,24 @@ export function DebtManager({
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-neutral-400">
-            {direction === "piutang" ? "Uang keluar dari:" : "Uang masuk ke:"}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-neutral-400">
+              {direction === "piutang"
+                ? "Uang keluar dari rekening:"
+                : "Uang masuk ke rekening:"}
+            </span>
+            <span className="text-xs text-neutral-300 dark:text-neutral-500">
+              {direction === "utang"
+                ? "Biarkan kosong jika utang karena makan/belanja (tidak ada uang masuk)"
+                : "Biarkan kosong jika tidak ada uang yang keluar"}
+            </span>
+          </div>
           <select
             value={acc}
             onChange={(e) => setAcc(e.target.value)}
             className={inputCls}
           >
-            <option value="">— tidak ubah saldo</option>
+            <option value="">— tidak ubah saldo (utang non-tunai)</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}

@@ -34,9 +34,9 @@ const MONTH_LABEL = [
   "Desember",
 ];
 
-function daysBetween(startStr: string, endStr: string): Date[] {
-  const [sy, sm, sd] = startStr.split("-").map(Number);
-  const [ey, em, ed] = endStr.split("-").map(Number);
+function daysBetween(s: string, e: string): Date[] {
+  const [sy, sm, sd] = s.split("-").map(Number),
+    [ey, em, ed] = e.split("-").map(Number);
   let cur = Date.UTC(sy, sm - 1, sd);
   const endU = Date.UTC(ey, em - 1, ed);
   const out: Date[] = [];
@@ -48,8 +48,8 @@ function daysBetween(startStr: string, endStr: string): Date[] {
   }
   return out;
 }
-function subDaysStr(baseStr: string, n: number): string {
-  const [y, m, d] = baseStr.split("-").map(Number);
+function subDaysStr(b: string, n: number): string {
+  const [y, m, d] = b.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() - n);
   return keyOf(dt);
@@ -66,7 +66,7 @@ export default async function ReportsPage({
   } = await supabase.auth.getUser();
   if (!user)
     return (
-      <div className="glass-card p-6 text-sm text-neutral-500">
+      <div className="card p-6 text-sm" style={{ color: "var(--text-3)" }}>
         Silakan login dulu.
       </div>
     );
@@ -74,12 +74,10 @@ export default async function ReportsPage({
   const today = jakartaToday();
   const isCustom = isDate(searchParams?.from) && isDate(searchParams?.to);
   const isMonth = !isCustom && searchParams?.range === "month";
-
-  let startStr: string;
-  let endStr: string;
+  let startStr: string, endStr: string;
   if (isCustom) {
-    const a = searchParams!.from!;
-    const b = searchParams!.to!;
+    const a = searchParams!.from!,
+      b = searchParams!.to!;
     startStr = a <= b ? a : b;
     endStr = a <= b ? b : a;
   } else {
@@ -89,11 +87,10 @@ export default async function ReportsPage({
   const days = daysBetween(startStr, endStr);
   const effEnd = days.length ? keyOf(days[days.length - 1]) : endStr;
   const wide = days.length > 10;
-
   const bym = effEnd.slice(0, 7);
   const [by, bm] = bym.split("-").map(Number);
-  const bMonthStart = `${bym}-01`;
-  const bMonthEnd = `${bym}-${pad(new Date(Date.UTC(by, bm, 0)).getUTCDate())}`;
+  const bMonthStart = `${bym}-01`,
+    bMonthEnd = `${bym}-${pad(new Date(Date.UTC(by, bm, 0)).getUTCDate())}`;
 
   const [
     { data: activities },
@@ -109,13 +106,13 @@ export default async function ReportsPage({
   ] = await Promise.all([
     supabase
       .from("activities")
-      .select("scheduled_date, status")
+      .select("scheduled_date,status")
       .eq("user_id", user.id)
       .gte("scheduled_date", startStr)
       .lte("scheduled_date", effEnd),
     supabase
       .from("transactions")
-      .select("type, amount, category, transaction_date")
+      .select("type,amount,category,transaction_date")
       .eq("user_id", user.id)
       .gte("transaction_date", startStr)
       .lte("transaction_date", effEnd),
@@ -127,7 +124,7 @@ export default async function ReportsPage({
     supabase.from("assets").select("estimated_value").eq("user_id", user.id),
     supabase
       .from("debts")
-      .select("direction, remaining_amount, status")
+      .select("direction,remaining_amount,status")
       .eq("user_id", user.id)
       .neq("status", "paid"),
     supabase
@@ -136,17 +133,17 @@ export default async function ReportsPage({
       .eq("user_id", user.id),
     supabase
       .from("goals")
-      .select("title, current_value, target_value, status")
+      .select("title,current_value,target_value,status")
       .eq("user_id", user.id)
       .neq("status", "archived")
       .limit(6),
     supabase
       .from("budget_categories")
-      .select("id, group_type")
+      .select("id,group_type")
       .eq("user_id", user.id),
     supabase
       .from("budgets")
-      .select("category_id, amount")
+      .select("category_id,amount")
       .eq("user_id", user.id)
       .eq("month", bMonthStart),
     supabase
@@ -159,15 +156,11 @@ export default async function ReportsPage({
   ]);
 
   const acts = activities ?? [];
-  const totalAct = acts.length;
   const doneAct = acts.filter((a: any) => a.status === "completed").length;
-  const actPct = totalAct ? Math.round((doneAct / totalAct) * 100) : 0;
+  const actPct = acts.length ? Math.round((doneAct / acts.length) * 100) : 0;
 
   const perDay = days.map((d) => {
     const key = keyOf(d);
-    const dayDone = acts.filter(
-      (a: any) => d10(a.scheduled_date) === key && a.status === "completed",
-    ).length;
     return {
       label: wide
         ? String(d.getUTCDate())
@@ -175,7 +168,9 @@ export default async function ReportsPage({
             timeZone: "UTC",
             weekday: "short",
           }).format(d),
-      done: dayDone,
+      done: acts.filter(
+        (a: any) => d10(a.scheduled_date) === key && a.status === "completed",
+      ).length,
     };
   });
   const maxDone = Math.max(1, ...perDay.map((p) => p.done));
@@ -249,159 +244,215 @@ export default async function ReportsPage({
       year: "numeric",
     }).format(new Date(s + "T00:00:00Z"));
 
+  const Stat = ({
+    label,
+    value,
+    sub,
+    color,
+  }: {
+    label: string;
+    value: string;
+    sub?: string;
+    color?: string;
+  }) => (
+    <div className="card p-4">
+      <p className="section-label">{label}</p>
+      <p
+        className="mt-2 text-xl font-bold"
+        style={{ color: color || "var(--text)" }}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p className="mt-0.5 text-xs" style={{ color: "var(--text-3)" }}>
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <section className="glass-card space-y-4 p-6">
-        <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-semibold">Reports</h1>
-            <p className="mt-1 text-sm text-neutral-500">
+            <h1 className="text-xl font-bold" style={{ color: "var(--text)" }}>
+              Reports
+            </h1>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--text-3)" }}>
               {fmtRange(startStr)} – {fmtRange(effEnd)}
             </p>
           </div>
-          <div className="flex gap-1 rounded-full bg-neutral-100 p-1 text-xs dark:bg-white/10">
+          <div
+            className="flex gap-1.5 rounded-xl p-1"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+            }}
+          >
             <Link
               href="/reports?range=week"
-              className={`rounded-full px-3 py-1 ${!isMonth && !isCustom ? "bg-white shadow dark:bg-neutral-800" : "text-neutral-500"}`}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+              style={
+                !isMonth && !isCustom
+                  ? {
+                      background: "var(--surface)",
+                      color: "var(--text)",
+                      boxShadow: "var(--shadow-sm)",
+                    }
+                  : { color: "var(--text-3)" }
+              }
             >
               7 hari
             </Link>
             <Link
               href="/reports?range=month"
-              className={`rounded-full px-3 py-1 ${isMonth ? "bg-white shadow dark:bg-neutral-800" : "text-neutral-500"}`}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+              style={
+                isMonth
+                  ? {
+                      background: "var(--surface)",
+                      color: "var(--text)",
+                      boxShadow: "var(--shadow-sm)",
+                    }
+                  : { color: "var(--text-3)" }
+              }
             >
               30 hari
             </Link>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3 dark:border-white/5">
-          <span className="text-xs text-neutral-400">Atau pilih rentang:</span>
+        <div
+          className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <span className="text-xs" style={{ color: "var(--text-3)" }}>
+            Atau pilih rentang:
+          </span>
           <DateRangePicker from={startStr} to={effEnd} />
         </div>
-      </section>
+      </div>
 
-      <section className="glass-card p-6">
-        <h2 className="mb-1 text-sm font-medium text-neutral-500">
-          Posisi Kekayaan (saat ini)
-        </h2>
-        <div className="text-2xl font-semibold">{rupiah(netWorth)}</div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-500 sm:grid-cols-4">
-          <div>
-            Kas &amp; rekening
-            <br />
-            <span className="text-sm text-neutral-900 dark:text-white">
-              {rupiah(totalCash)}
-            </span>
-          </div>
-          <div>
-            Aset
-            <br />
-            <span className="text-sm text-neutral-900 dark:text-white">
-              {rupiah(totalAssets)}
-            </span>
-          </div>
-          <div>
-            Piutang
-            <br />
-            <span className="text-sm text-emerald-600">
-              {rupiah(totalPiutang)}
-            </span>
-          </div>
-          <div>
-            Utang
-            <br />
-            <span className="text-sm text-red-500">-{rupiah(totalUtang)}</span>
-          </div>
+      {/* Kekayaan */}
+      <div className="card-gradient p-5">
+        <p
+          className="text-xs font-semibold uppercase tracking-widest"
+          style={{ color: "rgba(255,255,255,.7)" }}
+        >
+          Posisi Kekayaan
+        </p>
+        <p className="mt-1 text-3xl font-bold text-white">{rupiah(netWorth)}</p>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 text-xs">
+          {[
+            ["Kas", totalCash, "rgba(255,255,255,.9)"],
+            ["Aset", totalAssets, "rgba(255,255,255,.9)"],
+            ["Piutang", totalPiutang, "#86EFAC"],
+            ["Utang", -totalUtang, "#FCA5A5"],
+          ].map(([l, v, c]: any) => (
+            <div key={l}>
+              <p style={{ color: "rgba(255,255,255,.6)" }}>{l}</p>
+              <p className="font-bold mt-0.5" style={{ color: c }}>
+                {rupiah(v)}
+              </p>
+            </div>
+          ))}
         </div>
-        <div className="mt-2 text-xs text-neutral-400">
-          Dari kas di atas, tersimpan di tabungan: {rupiah(totalSavings)}
-        </div>
-      </section>
+        <p className="mt-2 text-xs" style={{ color: "rgba(255,255,255,.5)" }}>
+          Tersimpan di tabungan: {rupiah(totalSavings)}
+        </p>
+      </div>
 
-      <section className="grid grid-cols-2 gap-3">
-        <div className="glass-card p-4">
-          <div className="text-xs text-neutral-500">Aktivitas selesai</div>
-          <div className="mt-1 text-2xl font-semibold">{actPct}%</div>
-          <div className="text-xs text-neutral-400">
-            {doneAct}/{totalAct}
-          </div>
-        </div>
-        <div className="glass-card p-4">
-          <div className="text-xs text-neutral-500">Net finance</div>
-          <div
-            className={`mt-1 text-lg font-semibold ${net < 0 ? "text-red-500" : "text-emerald-600"}`}
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <Stat
+          label="Aktivitas selesai"
+          value={`${actPct}%`}
+          sub={`${doneAct}/${acts.length} aktivitas`}
+        />
+        <Stat
+          label="No-spend days"
+          value={`${noSpendCount} hari`}
+          sub="tanpa pengeluaran"
+          color="var(--green)"
+        />
+        <Stat label="Pemasukan" value={rupiah(income)} color="var(--green)" />
+        <Stat label="Pengeluaran" value={rupiah(expense)} color="var(--red)" />
+      </div>
+
+      {/* Budget adherence */}
+      <div className="card p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-semibold" style={{ color: "var(--text)" }}>
+            Budget {MONTH_LABEL[bm - 1]} {by}
+          </p>
+          <span
+            className="text-xs font-semibold"
+            style={{ color: budgetPct > 100 ? "var(--red)" : "var(--green)" }}
           >
-            {rupiah(net)}
-          </div>
-        </div>
-      </section>
-
-      <section className="glass-card p-6">
-        <h2 className="mb-3 text-sm font-medium text-neutral-500">
-          Budget vs Realisasi — {MONTH_LABEL[bm - 1]} {by}
-        </h2>
-        <div className="mb-2 flex justify-between text-sm">
-          <span className="text-neutral-500">
-            Realisasi {rupiah(actualExpenseMonth)}
-          </span>
-          <span className="text-neutral-500">
-            Budget {rupiah(budgetedExpense)}
+            {budgetPct}%
           </span>
         </div>
-        <div className="h-3 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
+        <div className="progress-track mb-1">
           <div
-            className={`h-full rounded-full ${budgetPct > 100 ? "bg-red-500" : "bg-emerald-500"}`}
+            className={`progress-fill ${budgetPct > 100 ? "progress-fill-red" : ""}`}
             style={{ width: `${Math.min(100, budgetPct)}%` }}
           />
         </div>
-        <div className="mt-1 text-xs text-neutral-400">
+        <p className="text-xs" style={{ color: "var(--text-3)" }}>
           {budgetedExpense === 0
-            ? "Belum set budget bulan ini."
+            ? "Belum set budget."
             : budgetPct > 100
-              ? `Over budget ${budgetPct - 100}%`
-              : `Terpakai ${budgetPct}% dari budget`}
-        </div>
-      </section>
+              ? `Over budget ${budgetPct - 100}% · Realisasi ${rupiah(actualExpenseMonth)} dari ${rupiah(budgetedExpense)}`
+              : `Terpakai ${rupiah(actualExpenseMonth)} dari ${rupiah(budgetedExpense)}`}
+        </p>
+      </div>
 
-      <section className="glass-card p-6">
-        <h2 className="mb-4 text-sm font-medium text-neutral-500">
+      {/* Aktivitas bar chart */}
+      <div className="card p-5">
+        <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
           Aktivitas Selesai per Hari
-        </h2>
-        <div className="flex items-end gap-1">
+        </p>
+        <div className="flex items-end gap-1" style={{ height: 100 }}>
           {perDay.map((p, i) => (
-            <div key={i} className="flex-1">
-              <div className="flex h-32 items-end">
-                <div
-                  className="w-full rounded-t bg-neutral-900 dark:bg-white"
-                  style={{
-                    height:
-                      p.done > 0
-                        ? `max(${(p.done / maxDone) * 100}%, 4px)`
-                        : "0%",
-                  }}
-                />
-              </div>
+            <div
+              key={i}
+              className="flex-1 flex flex-col items-center justify-end gap-1"
+            >
+              <div
+                className="w-full rounded-t"
+                style={{
+                  height:
+                    p.done > 0
+                      ? `${Math.max(4, (p.done / maxDone) * 80)}px`
+                      : "2px",
+                  background:
+                    p.done > 0
+                      ? "linear-gradient(180deg,#4F78FF,#7C5CFC)"
+                      : "var(--border)",
+                  borderRadius: 4,
+                }}
+              />
               {(!wide || i % 5 === 0) && (
-                <div className="mt-1 text-center text-[10px] text-neutral-400">
+                <span
+                  className="text-center"
+                  style={{ fontSize: 9, color: "var(--text-3)" }}
+                >
                   {p.label}
-                </div>
+                </span>
               )}
             </div>
           ))}
         </div>
-      </section>
+      </div>
 
-      <section className="glass-card p-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-neutral-500">
-            Hemat & Goals
-          </h2>
-          <span className="text-xs text-emerald-600">
-            {noSpendCount} hari tanpa pengeluaran
-          </span>
-        </div>
-        <ul className="space-y-2">
-          {(goals ?? []).map((g: any, i: number) => {
+      {/* Goals */}
+      <div className="card p-5">
+        <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
+          Progress Goals
+        </p>
+        <div className="space-y-3">
+          {(goals ?? []).map((g: any) => {
             const pct = Math.min(
               100,
               Math.round(
@@ -409,70 +460,64 @@ export default async function ReportsPage({
               ),
             );
             return (
-              <li key={i} className="text-sm">
-                <div className="mb-1 flex justify-between">
-                  <span>{g.title}</span>
-                  <span className="text-neutral-400">{pct}%</span>
+              <div key={g.title}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span style={{ color: "var(--text)" }}>{g.title}</span>
+                  <span
+                    className="font-semibold"
+                    style={{ color: "var(--brand-from)" }}
+                  >
+                    {pct}%
+                  </span>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-neutral-900 dark:bg-white"
-                    style={{ width: `${pct}%` }}
-                  />
+                <div className="progress-track">
+                  <div className="progress-fill" style={{ width: `${pct}%` }} />
                 </div>
-              </li>
+              </div>
             );
           })}
           {(!goals || goals.length === 0) && (
-            <p className="text-sm text-neutral-400">Belum ada goal aktif.</p>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>
+              Belum ada goal aktif.
+            </p>
           )}
-        </ul>
-      </section>
-
-      <section className="glass-card p-6">
-        <h2 className="mb-4 text-sm font-medium text-neutral-500">
-          Arus Kas Periode Ini
-        </h2>
-        <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg bg-emerald-500/10 p-3">
-            <div className="text-xs text-neutral-500">Pemasukan</div>
-            <div className="font-semibold text-emerald-600">
-              {rupiah(income)}
-            </div>
-          </div>
-          <div className="rounded-lg bg-red-500/10 p-3">
-            <div className="text-xs text-neutral-500">Pengeluaran</div>
-            <div className="font-semibold text-red-500">{rupiah(expense)}</div>
-          </div>
         </div>
-        {topCats.length > 0 && (
-          <div>
-            <div className="mb-2 text-xs text-neutral-500">
-              Top pengeluaran per kategori
-            </div>
-            <ul className="space-y-2">
-              {topCats.map(([cat, val]) => (
-                <li key={cat} className="text-sm">
-                  <div className="mb-1 flex justify-between">
-                    <span className="capitalize">{cat}</span>
-                    <span className="text-neutral-500">{rupiah(val)}</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-red-400"
-                      style={{ width: `${(val / maxCat) * 100}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
+      </div>
+
+      {/* Top kategori */}
+      {topCats.length > 0 && (
+        <div className="card p-5">
+          <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
+            Top Pengeluaran per Kategori
+          </p>
+          <div className="space-y-3">
+            {topCats.map(([cat, val]) => (
+              <div key={cat}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="capitalize" style={{ color: "var(--text)" }}>
+                    {cat}
+                  </span>
+                  <span style={{ color: "var(--text-2)" }}>{rupiah(val)}</span>
+                </div>
+                <div className="progress-track">
+                  <div
+                    className="progress-fill-red"
+                    style={{
+                      height: 6,
+                      borderRadius: 99,
+                      width: `${(val / maxCat) * 100}%`,
+                      background: "var(--red)",
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-        <p className="mt-3 text-xs text-neutral-400">
-          Catatan: transfer, nabung, & beli aset tidak dihitung sebagai
-          pemasukan/pengeluaran.
-        </p>
-      </section>
+          <p className="mt-3 text-xs" style={{ color: "var(--text-3)" }}>
+            Transfer, nabung & beli aset tidak dihitung sebagai pengeluaran.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

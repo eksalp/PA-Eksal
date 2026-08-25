@@ -4,69 +4,65 @@ import { TransactionList } from "./transaction-list";
 import { AccountManager } from "./account-manager";
 import { AssetManager } from "./asset-manager";
 import { DebtManager } from "./debt-manager";
+import { FinanceOverview } from "./finance-overview";
 
-function formatIDR(n: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function FinancePage() {
   const supabase = createClient() as any;
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!user)
     return (
-      <div className="glass-card p-6 text-sm text-neutral-500">
+      <div className="card p-6 text-sm" style={{ color: "var(--text-3)" }}>
         Silakan login dulu.
       </div>
     );
-  }
 
+  const uid = user.id;
   const [
     { data: accounts },
-    { data: transactions },
+    { data: categories },
+    { data: txns },
     { data: assets },
     { data: debts },
-    { data: categories },
   ] = await Promise.all([
     supabase
       .from("accounts")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", uid)
       .eq("is_active", true)
-      .order("created_at"),
-    supabase
-      .from("transactions")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("transaction_date", { ascending: false })
-      .limit(15),
-    supabase
-      .from("assets")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at"),
-    supabase
-      .from("debts")
-      .select("*")
-      .eq("user_id", user.id)
-      .neq("status", "paid")
       .order("created_at"),
     supabase
       .from("budget_categories")
       .select("id, name, group_type")
-      .eq("user_id", user.id)
+      .eq("user_id", uid)
       .order("sort_order"),
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", uid)
+      .order("transaction_date", { ascending: false })
+      .limit(50),
+    supabase
+      .from("assets")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false }),
+    // Ambil SEMUA debts (aktif + lunas) untuk akumulasi all-time
+    supabase
+      .from("debts")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false }),
   ]);
 
-  const acc = accounts ?? [];
-  const totalCash = acc.reduce(
+  const accs = accounts ?? [];
+  const allDebts = debts ?? [];
+
+  const totalCash = accs.reduce(
     (s: number, a: any) => s + Number(a.current_balance),
     0,
   );
@@ -74,52 +70,88 @@ export default async function FinancePage() {
     (s: number, a: any) => s + Number(a.estimated_value),
     0,
   );
-  const totalUtang = (debts ?? [])
+
+  // Aktif saja (untuk net worth dan overview utama)
+  const totalUtang = allDebts
+    .filter((d: any) => d.direction === "utang" && d.status !== "paid")
+    .reduce((s: number, d: any) => s + Number(d.remaining_amount), 0);
+  const totalPiutang = allDebts
+    .filter((d: any) => d.direction === "piutang" && d.status !== "paid")
+    .reduce((s: number, d: any) => s + Number(d.remaining_amount), 0);
+
+  // All-time: pakai original_amount (jumlah asli sebelum dilunasi)
+  const totalUtangAllTime = allDebts
     .filter((d: any) => d.direction === "utang")
-    .reduce((s: number, d: any) => s + Number(d.remaining_amount), 0);
-  const totalPiutang = (debts ?? [])
+    .reduce((s: number, d: any) => s + Number(d.original_amount), 0);
+  const totalPiutangAllTime = allDebts
     .filter((d: any) => d.direction === "piutang")
-    .reduce((s: number, d: any) => s + Number(d.remaining_amount), 0);
+    .reduce((s: number, d: any) => s + Number(d.original_amount), 0);
+
   const netWorth = totalCash + totalAssets + totalPiutang - totalUtang;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Finance</h1>
+    <div className="space-y-5">
+      <h1 className="text-xl font-bold" style={{ color: "var(--text)" }}>
+        Keuangan
+      </h1>
 
-      <div className="glass-card p-6">
-        <div className="text-sm text-neutral-500">
-          Perkiraan kekayaan bersih (net worth)
-        </div>
-        <div className="mt-1 text-2xl font-semibold">{formatIDR(netWorth)}</div>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-neutral-500 sm:grid-cols-4">
-          <div>Kas &amp; rekening: {formatIDR(totalCash)}</div>
-          <div>Aset: {formatIDR(totalAssets)}</div>
-          <div>Piutang: {formatIDR(totalPiutang)}</div>
-          <div>Utang: -{formatIDR(totalUtang)}</div>
-        </div>
+      <FinanceOverview
+        netWorth={netWorth}
+        totalCash={totalCash}
+        totalAssets={totalAssets}
+        totalPiutang={totalPiutang}
+        totalUtang={totalUtang}
+        totalPiutangAllTime={totalPiutangAllTime}
+        totalUtangAllTime={totalUtangAllTime}
+        accounts={accs}
+      />
+
+      <div className="card p-5">
+        <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
+          Catat Transaksi
+        </p>
+        <NewTransactionForm
+          userId={uid}
+          accounts={accs}
+          categories={categories ?? []}
+        />
       </div>
 
-      <AccountManager userId={user.id} accounts={acc} />
+      <div className="card p-5">
+        <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
+          Riwayat Transaksi
+        </p>
+        <TransactionList
+          transactions={txns ?? []}
+          categories={categories ?? []}
+        />
+      </div>
 
-      <NewTransactionForm
-        userId={user.id}
-        accounts={acc}
-        categories={categories ?? []}
-      />
+      <div className="card p-5">
+        <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
+          Kelola Rekening
+        </p>
+        <AccountManager userId={uid} accounts={accs} />
+      </div>
 
-      <TransactionList
-        transactions={transactions ?? []}
-        categories={categories ?? []}
-      />
+      <div className="card p-5">
+        <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
+          Aset
+        </p>
+        <AssetManager
+          userId={uid}
+          accounts={accs}
+          assets={assets ?? []}
+          categories={categories ?? []}
+        />
+      </div>
 
-      <DebtManager userId={user.id} debts={debts ?? []} accounts={acc} />
-
-      <AssetManager
-        userId={user.id}
-        assets={assets ?? []}
-        accounts={acc}
-        categories={categories ?? []}
-      />
+      <div className="card p-5">
+        <p className="mb-4 font-semibold" style={{ color: "var(--text)" }}>
+          Utang & Piutang
+        </p>
+        <DebtManager userId={uid} accounts={accs} debts={allDebts} />
+      </div>
     </div>
   );
 }

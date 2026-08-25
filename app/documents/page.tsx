@@ -9,14 +9,12 @@ export default async function DocumentsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!user)
     return (
-      <div className="glass-card p-6 text-sm text-neutral-500">
+      <div className="card p-6 text-sm" style={{ color: "var(--text-3)" }}>
         Silakan login dulu.
       </div>
     );
-  }
 
   const { data: documents } = await supabase
     .from("documents")
@@ -24,5 +22,17 @@ export default async function DocumentsPage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  return <DocumentList userId={user.id} initialDocuments={documents ?? []} />;
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-xl font-bold" style={{ color: "var(--text)" }}>
+          Dokumen Pribadi
+        </h1>
+        <p className="mt-0.5 text-sm" style={{ color: "var(--text-3)" }}>
+          {(documents ?? []).length} dokumen tersimpan
+        </p>
+      </div>
+      <DocumentList userId={user.id} initialDocuments={documents ?? []} />
+    </div>
+  );
 }

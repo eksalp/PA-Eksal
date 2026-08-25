@@ -1,257 +1,365 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export type Goal = {
+type Goal = {
   id: string;
-  user_id: string;
   title: string;
-  category: string | null;
-  target_value: number;
+  description: string | null;
   current_value: number;
+  target_value: number;
   unit: string | null;
-  deadline: string | null;
   status: string;
-  created_at: string;
 };
 
-const CATEGORIES = ["fitness", "learning", "career", "finance", "personal"];
+const idr = (n: number) => Number(n).toLocaleString("id-ID");
 
 export function GoalManager({
-  initialGoals,
   userId,
+  initialGoals,
 }: {
-  initialGoals: Goal[];
   userId: string;
+  initialGoals: Goal[];
 }) {
   const [goals, setGoals] = useState<Goal[]>(initialGoals);
-  const [busy, setBusy] = useState(false);
-
-  // Form tambah goal
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
   const [target, setTarget] = useState("");
+  const [current, setCurrent] = useState("");
   const [unit, setUnit] = useState("");
-  const [category, setCategory] = useState<string>("");
-  const [deadline, setDeadline] = useState("");
-
-  // cast: tabel "goals" belum ada di tipe hasil-generate
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
   const supabase = createClient() as any;
 
-  async function addGoal(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim() || !target) return;
-    setBusy(true);
+  const inputCls =
+    "w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all";
+  const inputStyle = {
+    borderColor: "var(--border)",
+    background: "var(--surface-2)",
+    color: "var(--text)",
+  };
 
-    const { data, error } = await supabase
-      .from("goals")
-      .insert({
-        user_id: userId,
-        title: title.trim(),
-        target_value: Number(target),
-        current_value: 0,
-        unit: unit.trim() || null,
-        category: category || null,
-        deadline: deadline || null,
-        status: "active",
-      })
-      .select()
-      .single();
-
-    setBusy(false);
-    if (error) {
-      alert("Gagal menambah goal: " + error.message);
-      return;
-    }
-
-    setGoals([data as Goal, ...goals]);
+  function openNew() {
+    setEditId(null);
     setTitle("");
+    setDesc("");
     setTarget("");
+    setCurrent("0");
     setUnit("");
-    setCategory("");
-    setDeadline("");
+    setShowForm(true);
+  }
+  function openEdit(g: Goal) {
+    setEditId(g.id);
+    setTitle(g.title);
+    setDesc(g.description || "");
+    setTarget(String(g.target_value));
+    setCurrent(String(g.current_value));
+    setUnit(g.unit || "");
+    setShowForm(true);
+  }
+  function cancel() {
+    setShowForm(false);
+    setEditId(null);
   }
 
-  async function updateProgress(goal: Goal, newValue: number) {
-    const clamped = Math.max(0, newValue);
-    const status = clamped >= goal.target_value ? "done" : "active";
+  async function save() {
+    if (!title.trim() || !target) return alert("Isi judul & target dulu.");
+    setBusy(true);
+    const payload = {
+      user_id: userId,
+      title: title.trim(),
+      description: desc.trim() || null,
+      target_value: Number(target),
+      current_value: Number(current) || 0,
+      unit: unit.trim() || null,
+      status: "active",
+    };
+    if (editId) {
+      const { data: row } = await supabase
+        .from("goals")
+        .update(payload)
+        .eq("id", editId)
+        .select()
+        .single();
+      setGoals((g) => g.map((x) => (x.id === editId ? row : x)));
+    } else {
+      const { data: row } = await supabase
+        .from("goals")
+        .insert(payload)
+        .select()
+        .single();
+      setGoals((g) => [row, ...g]);
+    }
+    setBusy(false);
+    cancel();
+  }
 
-    // optimistic update
-    setGoals((prev) =>
-      prev.map((g) =>
-        g.id === goal.id ? { ...g, current_value: clamped, status } : g,
-      ),
+  async function updateProgress(id: string, val: number) {
+    const g = goals.find((x) => x.id === id);
+    if (!g) return;
+    const np = Math.max(0, Math.min(g.target_value, val));
+    const status = np >= g.target_value ? "done" : "active";
+    setGoals((gs) =>
+      gs.map((x) => (x.id === id ? { ...x, current_value: np, status } : x)),
     );
-
-    const { error } = await supabase
+    await supabase
       .from("goals")
-      .update({
-        current_value: clamped,
-        status,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", goal.id);
-
-    if (error) alert("Gagal update: " + error.message);
+      .update({ current_value: np, status })
+      .eq("id", id);
   }
 
-  async function deleteGoal(goal: Goal) {
-    if (!confirm(`Hapus goal "${goal.title}"?`)) return;
-    setGoals((prev) => prev.filter((g) => g.id !== goal.id));
-    const { error } = await supabase.from("goals").delete().eq("id", goal.id);
-    if (error) alert("Gagal hapus: " + error.message);
+  async function archive(id: string) {
+    if (!confirm("Arsipkan goal ini?")) return;
+    setGoals((g) => g.filter((x) => x.id !== id));
+    await supabase.from("goals").update({ status: "archived" }).eq("id", id);
+    router.refresh();
   }
+
+  const active = goals.filter((g) => g.status !== "done");
+  const done = goals.filter((g) => g.status === "done");
 
   return (
-    <>
-      {/* Form tambah goal */}
-      <section className="glass-card p-6">
-        <h2 className="mb-4 text-sm font-medium text-neutral-500">
-          Tambah Goal
-        </h2>
-        <form onSubmit={addGoal} className="space-y-3">
-          <input
-            type="text"
-            placeholder="Judul goal (misal: Lari bulan ini)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-lg border border-neutral-200 bg-white/60 px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5"
-          />
-          <div className="flex gap-3">
+    <div className="space-y-4">
+      {/* Add button */}
+      {!showForm && (
+        <button
+          onClick={openNew}
+          className="btn-primary w-full justify-center"
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          + Tambah Goal
+        </button>
+      )}
+
+      {/* Form */}
+      {showForm && (
+        <div className="card p-5 space-y-3">
+          <h2 className="font-semibold" style={{ color: "var(--text)" }}>
+            {editId ? "Edit Goal" : "Goal Baru"}
+          </h2>
+          <div className="space-y-2">
             <input
-              type="number"
-              placeholder="Target (misal: 50)"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              className="w-full rounded-lg border border-neutral-200 bg-white/60 px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5"
+              className={inputCls}
+              style={inputStyle}
+              placeholder="Judul goal"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
             <input
-              type="text"
-              placeholder="Satuan (km, buku…)"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="w-full rounded-lg border border-neutral-200 bg-white/60 px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5"
+              className={inputCls}
+              style={inputStyle}
+              placeholder="Deskripsi (opsional)"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
             />
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                className={inputCls}
+                style={inputStyle}
+                placeholder="Target"
+                type="number"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+              />
+              <input
+                className={inputCls}
+                style={inputStyle}
+                placeholder="Saat ini"
+                type="number"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+              />
+              <input
+                className={inputCls}
+                style={inputStyle}
+                placeholder="Satuan"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="flex gap-3">
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-lg border border-neutral-200 bg-white/60 px-3 py-2 text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5"
+          <div className="flex gap-2">
+            <button
+              onClick={save}
+              disabled={busy}
+              className="btn-primary flex-1 justify-center"
+              style={{ display: "flex" }}
             >
-              <option value="">Kategori (opsional)</option>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="w-full rounded-lg border border-neutral-200 bg-white/60 px-3 py-2 text-sm text-neutral-600 outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5 dark:text-neutral-300"
-            />
+              {busy ? "Menyimpan…" : "Simpan"}
+            </button>
+            <button
+              onClick={cancel}
+              className="btn-ghost flex-1 justify-center"
+              style={{ display: "flex" }}
+            >
+              Batal
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900"
-          >
-            {busy ? "Menyimpan…" : "Tambah"}
-          </button>
-        </form>
-      </section>
+        </div>
+      )}
 
-      {/* Daftar goals */}
-      <section className="glass-card p-6">
-        <h2 className="mb-4 text-sm font-medium text-neutral-500">
-          Daftar Goal
-        </h2>
-
-        {goals.length === 0 && (
-          <p className="text-sm text-neutral-400">
-            Belum ada goal. Tambahin di atas.
-          </p>
-        )}
-
-        <ul className="space-y-4">
-          {goals.map((g) => {
+      {/* Active goals */}
+      {active.length > 0 && (
+        <div className="space-y-3">
+          {active.map((g) => {
             const pct = Math.min(
               100,
               Math.round((g.current_value / (g.target_value || 1)) * 100),
             );
-            const done = g.status === "done";
             return (
-              <li
-                key={g.id}
-                className="rounded-xl bg-white/40 p-4 dark:bg-white/5"
-              >
-                <div className="flex items-start justify-between gap-3">
+              <div key={g.id} className="card p-5 space-y-3">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div
-                      className={`font-medium ${done ? "text-emerald-600" : ""}`}
+                    <p
+                      className="font-semibold"
+                      style={{ color: "var(--text)" }}
                     >
-                      {g.title} {done && "✓"}
-                    </div>
-                    <div className="mt-0.5 text-xs text-neutral-400">
-                      {g.category ? `${g.category} · ` : ""}
-                      {g.current_value}
-                      {g.unit ? ` ${g.unit}` : ""} / {g.target_value}
-                      {g.unit ? ` ${g.unit}` : ""}
-                      {g.deadline ? ` · target ${g.deadline}` : ""}
-                    </div>
+                      {g.title}
+                    </p>
+                    {g.description && (
+                      <p
+                        className="mt-0.5 text-xs"
+                        style={{ color: "var(--text-3)" }}
+                      >
+                        {g.description}
+                      </p>
+                    )}
                   </div>
-                  <button
-                    onClick={() => deleteGoal(g)}
-                    className="text-xs text-neutral-400 hover:text-red-500"
-                  >
-                    hapus
-                  </button>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      onClick={() => openEdit(g)}
+                      className="text-xs px-2.5 py-1 rounded-lg"
+                      style={{
+                        background: "var(--surface-2)",
+                        color: "var(--text-2)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => archive(g.id)}
+                      className="text-xs px-2.5 py-1 rounded-lg"
+                      style={{
+                        background: "var(--surface-2)",
+                        color: "var(--text-3)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      Arsip
+                    </button>
+                  </div>
                 </div>
-
-                {/* Progress bar */}
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
+                <div>
                   <div
-                    className={`h-full rounded-full ${done ? "bg-emerald-500" : "bg-neutral-900 dark:bg-white"}`}
-                    style={{ width: `${pct}%` }}
-                  />
+                    className="mb-1.5 flex justify-between text-xs"
+                    style={{ color: "var(--text-3)" }}
+                  >
+                    <span>
+                      {idr(g.current_value)} / {idr(g.target_value)} {g.unit}
+                    </span>
+                    <span
+                      className="font-semibold"
+                      style={{ color: "var(--brand-from)" }}
+                    >
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="progress-track">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
-
-                {/* Kontrol update */}
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    onClick={() => updateProgress(g, g.current_value - 1)}
-                    className="h-7 w-7 rounded-full border border-neutral-200 text-sm dark:border-white/10"
-                  >
-                    −
-                  </button>
-                  <button
-                    onClick={() => updateProgress(g, g.current_value + 1)}
-                    className="h-7 w-7 rounded-full border border-neutral-200 text-sm dark:border-white/10"
-                  >
-                    +
-                  </button>
+                <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    defaultValue={g.current_value}
-                    onKeyDown={(e) => {
+                    className={inputCls}
+                    style={{ ...inputStyle, fontSize: 13 }}
+                    placeholder="Update progress"
+                    onKeyDown={async (e) => {
                       if (e.key === "Enter") {
-                        updateProgress(
-                          g,
+                        await updateProgress(
+                          g.id,
                           Number((e.target as HTMLInputElement).value),
                         );
+                        (e.target as HTMLInputElement).value = "";
                       }
                     }}
-                    className="ml-1 w-20 rounded-lg border border-neutral-200 bg-white/60 px-2 py-1 text-sm outline-none focus:border-neutral-400 dark:border-white/10 dark:bg-white/5"
                   />
-                  <span className="text-xs text-neutral-400">{pct}%</span>
+                  <span
+                    className="text-xs shrink-0"
+                    style={{ color: "var(--text-3)" }}
+                  >
+                    Enter ↵
+                  </span>
                 </div>
-              </li>
+              </div>
             );
           })}
-        </ul>
-      </section>
-    </>
+        </div>
+      )}
+
+      {/* Done goals */}
+      {done.length > 0 && (
+        <div>
+          <p className="section-label mb-3">Selesai 🎉</p>
+          <div className="space-y-2">
+            {done.map((g) => (
+              <div
+                key={g.id}
+                className="card p-4 flex items-center gap-3"
+                style={{ opacity: 0.75 }}
+              >
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm"
+                  style={{
+                    background: "var(--green-bg)",
+                    color: "var(--green)",
+                  }}
+                >
+                  ✓
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-medium truncate"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {g.title}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                    {idr(g.target_value)} {g.unit}
+                  </p>
+                </div>
+                <button
+                  onClick={() => archive(g.id)}
+                  className="text-xs shrink-0"
+                  style={{ color: "var(--text-3)" }}
+                >
+                  Arsip
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {goals.length === 0 && !showForm && (
+        <div className="card p-10 text-center">
+          <p className="text-3xl mb-3">🎯</p>
+          <p className="font-semibold" style={{ color: "var(--text)" }}>
+            Belum ada goal
+          </p>
+          <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
+            Tambahkan goal pertamamu di atas.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
